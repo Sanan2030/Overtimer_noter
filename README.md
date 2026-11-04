@@ -96,8 +96,10 @@ Testlər maaş və əmsalları, fasilə/gecə işini, JSON/XLSX dövrəsini, ori
 ## Vercel
 
 1. Layihəni GitHub repozitoriyasına göndərin və Vercel-də həmin repozitoriyanı import edin.
-2. Framework: **Next.js**; build: `npm run build`; install: `npm ci`. Output Directory üçün Next.js standartını saxlayın.
+2. `vercel.json` framework-ü **Next.js**, build əmrini `npm run build`, install əmrini `npm ci`, Output Directory-ni `.next` kimi təyin edir. Layihəni **Other** / statik sayt kimi deploy etməyin və çıxış qovluğu olaraq `public` seçməyin.
 3. Node.js **24.x** seçin. Environment variable və database tələb olunmur.
 4. Deploy-dan sonra bir qeyd yaradın, səhifəni yeniləyin və JSON/Excel ixracını yoxlayın.
 
-Bu repozitoriya üçün deploy və ya GitHub-a push avtomatik edilmir.
+`STATIC_BUILD_NO_OUT_DIR` və ya “No Output Directory named public” xətası tətbiqin build xətası deyil: Vercel statik sayt ayarlarından istifadə edir. `vercel.json` olan son commiti deploy edin. Paneldə framework-ün **Next.js** olduğuna əmin olun.
+
+GitHub inteqrasiyası aktivdirsə `main` branch-inə yeni push Vercel-də avtomatik deploy başlada bilər.
