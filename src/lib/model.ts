@@ -1,3 +1,5 @@
+import { getWorkNorm } from "./work-calendar";
+
 export const MONTHS = [
   "Yanvar",
   "Fevral",
@@ -101,14 +103,21 @@ export function durationMinutes(
   }
   return elapsed - entry.breakMinutes;
 }
-export function hourlyRate(config?: MonthConfig): number | null {
-  return config && config.hours > 0 ? config.salary / config.hours : null;
+export function hourlyRate(
+  config?: MonthConfig,
+  month?: string,
+): number | null {
+  const hours = month ? getWorkNorm(month)?.hours : config?.hours;
+  return config && hours && hours > 0 ? config.salary / hours : null;
 }
 export function entryRate(
   entry: Entry,
   months: AppData["months"],
 ): number | null {
-  return entry.rate ?? hourlyRate(months[entry.date.slice(0, 7)]);
+  const month = entry.date.slice(0, 7);
+  // A saved monthly salary always uses that exact month's official divisor.
+  // Explicit amounts from imported files remain usable when no salary is known.
+  return hourlyRate(months[month], month) ?? entry.rate;
 }
 export function amount(entry: Entry, months: AppData["months"]): number | null {
   const rate = entryRate(entry, months);
@@ -256,7 +265,10 @@ export function validateData(value: unknown): AppData {
       config.hours > 744
     )
       throw new Error("Aylıq maaş və ya norma saatı düzgün deyil.");
-    result.months[month] = { salary: config.salary, hours: config.hours };
+    result.months[month] = {
+      salary: config.salary,
+      hours: getWorkNorm(month)?.hours ?? config.hours,
+    };
   }
   result.entries = data.entries.map(validateEntry);
   if (
@@ -279,7 +291,9 @@ export function mergeData(
     const key = raw.date.slice(0, 7);
     const entry = {
       ...raw,
-      rate: raw.rate ?? hourlyRate(imported.months[key] ?? current.months[key]),
+      rate:
+        raw.rate ??
+        hourlyRate(imported.months[key] ?? current.months[key], key),
     };
     if (seen.has(fingerprint(entry))) continue;
     seen.add(fingerprint(entry));

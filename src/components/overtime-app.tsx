@@ -17,6 +17,8 @@ import {
   FileSpreadsheet,
   FolderOpen,
   LoaderCircle,
+  ListFilter,
+  RotateCcw,
   Pencil,
   Plus,
   Search,
@@ -39,6 +41,7 @@ import {
   mergeData,
   money,
   monthLabel,
+  hourlyRate,
   newEntry,
   validateData,
 } from "@/lib/model";
@@ -51,7 +54,9 @@ import {
   parseWorkbook,
 } from "@/lib/files";
 import { STORAGE_KEY } from "@/lib/model";
+import { getWorkNorm, CALENDAR_INDEX_URL } from "@/lib/work-calendar";
 import { EntryForm } from "./entry-form";
+import ThemeToggle from "./theme-toggle";
 import {
   ActivitySummary,
   Breakdown,
@@ -91,6 +96,7 @@ export default function OvertimeApp() {
   const [period, setPeriod] = useState("");
   const [search, setSearch] = useState("");
   const [project, setProject] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [multiplierFilter, setMultiplierFilter] = useState("");
   const [entryModal, setEntryModal] = useState<{
     entry: Entry;
@@ -418,7 +424,21 @@ export default function OvertimeApp() {
             </span>
             <span>ArtıSaat</span>
           </a>
+          <nav className="page-tabs" aria-label="Əsas menyu">
+            {NAV.map((item) => (
+              <button
+                key={item.id}
+                aria-label={item.label}
+                aria-current={page === item.id ? "page" : undefined}
+                className={page === item.id ? "active" : ""}
+                onClick={() => setPage(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
           <div className="header-actions">
+            <ThemeToggle />
             <div className={`save-status ${storageError ? "save-error" : ""}`}>
               {storageError ? (
                 <CircleHelp size={15} />
@@ -464,87 +484,92 @@ export default function OvertimeApp() {
             </button>
           </div>
         )}
-        <nav className="page-tabs" aria-label="Əsas menyu">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              aria-label={item.label}
-              aria-current={page === item.id ? "page" : undefined}
-              className={page === item.id ? "active" : ""}
-              onClick={() => setPage(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="page-heading">
-          <div>
-            <h1>{TITLES[page]}</h1>
-            <p>{SUBTITLES[page]}</p>
+
+        {page !== "records" ? (
+          <div className="page-heading">
+            <div>
+              <h1>{TITLES[page]}</h1>
+              <p>{SUBTITLES[page]}</p>
+            </div>
           </div>
-          {page === "records" && (
-            <button
-              className="button primary"
-              onClick={openNew}
-              disabled={Boolean(corruptRaw)}
-            >
-              <Plus size={18} />
-              Yeni qeyd
-            </button>
-          )}
-        </div>
+        ) : (
+          <h1 className="sr-only">Əlavə iş saatları</h1>
+        )}
         {page !== "data" && (
           <div className="period-toolbar">
-            <div className="period-selector">
-              <CalendarDays size={17} />
-              <select
-                aria-label="Hesabat dövrü"
-                value={period}
-                onChange={(event) => {
-                  setPeriod(event.target.value);
-                  setProject("");
-                }}
-              >
-                <option value="all">Bütün tarixlər</option>
-                {months.map((key) => (
-                  <option key={key} value={key}>
-                    {monthLabel(key)}
-                  </option>
-                ))}
-              </select>
-              <div className="month-arrows">
-                <button aria-label="Əvvəlki ay" onClick={() => changeMonth(-1)}>
-                  <ChevronLeft size={17} />
-                </button>
-                <button aria-label="Növbəti ay" onClick={() => changeMonth(1)}>
-                  <ChevronRight size={17} />
+            <div className="period-left">
+              <div className="period-selector">
+                <CalendarDays size={17} />
+                <select
+                  aria-label="Hesabat dövrü"
+                  value={period}
+                  onChange={(event) => {
+                    setPeriod(event.target.value);
+                    setProject("");
+                  }}
+                >
+                  <option value="all">Bütün tarixlər</option>
+                  {months.map((key) => (
+                    <option key={key} value={key}>
+                      {monthLabel(key)}
+                    </option>
+                  ))}
+                </select>
+                <div className="month-arrows">
+                  <button
+                    aria-label="Əvvəlki ay"
+                    onClick={() => changeMonth(-1)}
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button
+                    aria-label="Növbəti ay"
+                    onClick={() => changeMonth(1)}
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </div>
+              <div className="salary-control">
+                <button
+                  className="button secondary salary-button"
+                  aria-label="Aylıq maaş"
+                  onClick={() => setSalaryMonth(month)}
+                >
+                  <Wallet size={19} />
+                  <span>
+                    Aylıq maaş
+                    {data.months[month] ? (
+                      <>
+                        : <strong>{money(data.months[month].salary)} ₼</strong>
+                        <small> / {getWorkNorm(month)?.hours ?? "—"} s</small>
+                      </>
+                    ) : (
+                      " əlavə et"
+                    )}
+                  </span>
                 </button>
               </div>
             </div>
-            <div className="salary-control">
-              {period !== "all" && data.months[month] && (
-                <span>
-                  {money(data.months[month].salary / data.months[month].hours)}{" "}
-                  ₼ / saat
-                </span>
-              )}
+            {page === "records" && (
               <button
-                className="button secondary small"
-                onClick={() => setSalaryMonth(month)}
+                className="button primary new-record-button"
+                onClick={openNew}
+                disabled={Boolean(corruptRaw)}
               >
-                <Wallet size={16} />
-                Aylıq maaş
+                <Plus size={21} />
+                Yeni qeyd
               </button>
-            </div>
+            )}
           </div>
         )}
         {page === "records" && (
           <>
-            <Stats entries={filteredEntries} data={data} compact />
+            <Stats entries={selectedEntries} data={data} compact />
             {!data.months[month] && period !== "all" && (
               <p className="setup-note">
-                Məbləği hesablamaq üçün “Aylıq maaş” bölməsində net maaşını və
-                norma saatını daxil et.
+                “Aylıq maaş” bölməsində net maaşını daxil et. Rəsmi norma saatı
+                avtomatik seçilir.
               </p>
             )}
             <section
@@ -552,44 +577,67 @@ export default function OvertimeApp() {
               aria-label="Əlavə iş qeydləri"
             >
               <div className="records-toolbar">
-                <h2>
-                  Qeydlər{" "}
-                  <span className="count-badge">{filteredEntries.length}</span>
-                </h2>
-                {data.entries.length > 0 && (
-                  <div className="record-tools">
-                    <label className="search-box">
-                      <Search size={17} />
-                      <input
-                        type="search"
-                        aria-label="Qeydlərdə axtar"
-                        placeholder="Qeyd axtar…"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </label>
-                    <button
-                      className="button secondary small"
-                      onClick={exportExcel}
-                      disabled={busy || filteredEntries.length === 0}
-                    >
-                      {busy ? (
-                        <LoaderCircle size={16} className="spin" />
-                      ) : (
-                        <Download size={16} />
-                      )}
-                      <span>Excel ixrac et</span>
-                    </button>
-                  </div>
-                )}
+                <h2 className="sr-only">Qeydlər</h2>
+                <div className="record-tools">
+                  <label className="search-box">
+                    <Search size={21} />
+                    <input
+                      type="search"
+                      aria-label="Qeydlərdə axtar"
+                      placeholder="Qeydlərdə axtarış (mövzu, layihə, əməkdaş)…"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="button filter-toggle"
+                    aria-expanded={filtersOpen}
+                    aria-controls="record-filter-fields"
+                    onClick={() => setFiltersOpen((value) => !value)}
+                  >
+                    <ListFilter size={20} />
+                    <span>Filtrlər</span>
+                    {(project || multiplierFilter) && (
+                      <small>
+                        {Number(Boolean(project)) +
+                          Number(Boolean(multiplierFilter))}
+                      </small>
+                    )}
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Filtrləri təmizlə"
+                    title="Filtrləri təmizlə"
+                    onClick={() => {
+                      setSearch("");
+                      setProject("");
+                      setMultiplierFilter("");
+                    }}
+                  >
+                    <RotateCcw size={19} />
+                  </button>
+                  <button
+                    className="icon-button export-icon"
+                    aria-label="Excel ixrac et"
+                    title="Excel ixrac et"
+                    onClick={exportExcel}
+                    disabled={busy || filteredEntries.length === 0}
+                  >
+                    {busy ? (
+                      <LoaderCircle className="spin" size={19} />
+                    ) : (
+                      <Download size={19} />
+                    )}
+                  </button>
+                </div>
               </div>
-              {data.entries.length > 0 && (
-                <details className="record-filters">
-                  <summary>
-                    Layihə və əmsal üzrə filtr
-                    {project || multiplierFilter ? " · aktiv" : ""}
-                  </summary>
-                  <div className="filters">
+              <div
+                className="record-filters"
+                id="record-filter-fields"
+                hidden={!filtersOpen}
+              >
+                <div className="filters">
+                  <Field label="Layihə">
                     <select
                       aria-label="Layihəyə görə filtr"
                       value={project}
@@ -600,6 +648,8 @@ export default function OvertimeApp() {
                         <option key={value}>{value}</option>
                       ))}
                     </select>
+                  </Field>
+                  <Field label="Əmsal">
                     <select
                       aria-label="Əmsala görə filtr"
                       value={multiplierFilter}
@@ -607,40 +657,30 @@ export default function OvertimeApp() {
                         setMultiplierFilter(event.target.value)
                       }
                     >
-                      <option value="">Bütün əmsallar</option>
+                      <option value="">Hamısı</option>
                       <option value="1">1x</option>
                       <option value="2">2x</option>
                       <option value="3">3x</option>
                     </select>
-                    {(search || project || multiplierFilter) && (
-                      <button
-                        className="text-link"
-                        onClick={() => {
-                          setSearch("");
-                          setProject("");
-                          setMultiplierFilter("");
-                        }}
-                      >
-                        Təmizlə
-                      </button>
-                    )}
-                  </div>
-                </details>
-              )}
+                  </Field>
+                  <p>
+                    Göstərilir: <strong>{filteredEntries.length}</strong> /{" "}
+                    {selectedEntries.length} qeyd
+                  </p>
+                </div>
+              </div>
               {visibleEntries.length > 0 ? (
                 <>
                   <div className="table-scroll">
                     <table className="records-table">
                       <thead>
                         <tr>
-                          <th>Tarix / vaxt</th>
-                          <th>Mövzu / layihə</th>
-                          <th>Müddət</th>
+                          <th>Tarix və vaxt</th>
+                          <th>Mövzu və layihə</th>
+                          <th>Faktiki saat</th>
                           <th>Əmsal</th>
                           <th className="amount-cell">Məbləğ</th>
-                          <th>
-                            <span className="sr-only">Əməliyyatlar</span>
-                          </th>
+                          <th>Əməliyyatlar</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -658,7 +698,9 @@ export default function OvertimeApp() {
                                 {entry.subject || "Mövzu qeyd edilməyib"}
                               </strong>
                               <small>
-                                {entry.project || "Layihəsiz"}
+                                <span className="project-label">
+                                  {entry.project || "Layihəsiz"}
+                                </span>
                                 {entry.customer ? ` · ${entry.customer}` : ""}
                               </small>
                             </td>
@@ -735,6 +777,30 @@ export default function OvertimeApp() {
                       {(actualPage - 1) * 15 + 1}–
                       {Math.min(actualPage * 15, filteredEntries.length)}
                     </span>
+                    <div className="record-summary-inline">
+                      <span>
+                        Cəmi:{" "}
+                        <strong>
+                          {formatDuration(
+                            filteredEntries.reduce(
+                              (sum, entry) => sum + durationMinutes(entry),
+                              0,
+                            ),
+                          )}
+                        </strong>{" "}
+                        saat
+                      </span>
+                      <strong>
+                        {money(
+                          filteredEntries.reduce(
+                            (sum, entry) =>
+                              sum + (amount(entry, data.months) ?? 0),
+                            0,
+                          ),
+                        )}{" "}
+                        ₼
+                      </strong>
+                    </div>
                     <div>
                       <button
                         className="icon-button"
@@ -786,6 +852,11 @@ export default function OvertimeApp() {
                 />
               )}
             </section>
+            <p className="privacy-strip">
+              <ShieldCheck size={20} />
+              Məlumatlar yalnız brauzerinin yerli yaddaşında saxlanılır. Ehtiyat
+              nüsxə üçün JSON endirə bilərsən.
+            </p>
           </>
         )}
         {page === "analytics" && (
@@ -967,14 +1038,13 @@ export default function OvertimeApp() {
           initialMonth={salaryMonth}
           data={data}
           close={() => setSalaryMonth(null)}
-          save={(key, salary, hours, apply) => {
+          save={(key, salary) => {
+            const hours = getWorkNorm(key)!.hours;
             const success = commit((old) => ({
               ...old,
               months: { ...old.months, [key]: { salary, hours } },
               entries: old.entries.map((e) =>
-                e.date.startsWith(key) && (apply || e.rate === null)
-                  ? { ...e, rate: salary / hours }
-                  : e,
+                e.date.startsWith(key) ? { ...e, rate: salary / hours } : e,
               ),
             }));
             if (success) {
@@ -1066,8 +1136,8 @@ export default function OvertimeApp() {
               <span>01</span>
               <h3>Aylıq maaşını daxil et</h3>
               <p>
-                Saatlıq tarif = aylıq net maaş ÷ ayın norma iş saatı. Hər ayın
-                ayarı ayrıca saxlanır.
+                Saatlıq tarif = aylıq net maaş ÷ həmin ay üçün ƏƏSMN-nin rəsmi
+                norma saatı. Yalnız maaşını daxil edirsən.
               </p>
             </div>
             <div>
@@ -1075,7 +1145,8 @@ export default function OvertimeApp() {
               <h3>Vaxtını və əmsalı seç</h3>
               <p>
                 Məbləğ = faktiki saat × saatlıq tarif × əmsal. 1x standartdır;
-                2x və 3x də seçilə bilər. Fasilə iş vaxtından çıxılır.
+                2x və 3x də seçilə bilər. Müddət başlanma və bitmə saatlarına
+                əsasən hesablanır.
               </p>
             </div>
             <div>
@@ -1133,26 +1204,20 @@ function SalaryForm({
   initialMonth: string;
   data: AppData;
   close: () => void;
-  save: (month: string, salary: number, hours: number, apply: boolean) => void;
+  save: (month: string, salary: number) => void;
 }) {
   const [month, setMonth] = useState(initialMonth);
   const [salary, setSalary] = useState(
     String(data.months[initialMonth]?.salary ?? ""),
   );
-  const [hours, setHours] = useState(
-    String(data.months[initialMonth]?.hours ?? ""),
-  );
-  const [apply, setApply] = useState(false);
+  const norm = getWorkNorm(month);
+  const hours = norm?.hours ?? null;
   const [error, setError] = useState("");
-  const rate =
-    salary !== "" && Number(hours) > 0 ? Number(salary) / Number(hours) : null;
-  const existing = data.entries.filter(
-    (e) => e.date.startsWith(month) && e.rate !== null,
-  ).length;
+  const rate = salary !== "" && hours ? Number(salary) / hours : null;
   return (
     <Modal
       title="Aylıq maaş ayarları"
-      subtitle="Hər ayın maaşı və norma saatı ayrıca saxlanır."
+      subtitle="Net maaşını daxil et. Ayın norma saatı rəsmi təqvimdən seçilir."
       close={close}
     >
       <form
@@ -1161,16 +1226,16 @@ function SalaryForm({
           if (
             !/^\d{4}-\d{2}$/.test(month) ||
             !salary ||
-            !hours ||
+            !norm ||
             !Number.isFinite(Number(salary)) ||
             Number(salary) < 0 ||
             Number(hours) <= 0 ||
             Number(hours) > 744
           ) {
-            setError("Ayı, net maaşı və düzgün norma saatını daxil et.");
+            setError("Ayı, net maaşı və düzgün rəsmi norma avtomatik seçilir.");
             return;
           }
-          save(month, Number(salary), Number(hours), apply);
+          save(month, Number(salary));
         }}
       >
         <div className="modal-body">
@@ -1185,8 +1250,6 @@ function SalaryForm({
                 const key = e.target.value;
                 setMonth(key);
                 setSalary(String(data.months[key]?.salary ?? ""));
-                setHours(String(data.months[key]?.hours ?? ""));
-                setApply(false);
               }}
             />
           </Field>
@@ -1203,18 +1266,18 @@ function SalaryForm({
                 onChange={(e) => setSalary(e.target.value)}
               />
             </Field>
-            <Field label="Norma iş saatı" hint="Ayın adi iş saatlarının cəmi">
-              <input
-                type="number"
-                required
-                placeholder="Məsələn, 160"
-                min="0.01"
-                max="744"
-                step="0.01"
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-              />
-            </Field>
+            <div className="norm-note">
+              <span>Rəsmi norma iş saatı</span>
+              <strong>{norm ? `${norm.hours} saat` : "Məlumat yoxdur"}</strong>
+              <small>Beşgünlük, həftədə 40 saat</small>
+              <a
+                href={norm?.sourceUrl ?? CALENDAR_INDEX_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                ƏƏSMN · İstehsalat təqvimi ↗
+              </a>
+            </div>
           </div>
           <div className="rate-preview">
             <span>Saatlıq tarif</span>
@@ -1224,19 +1287,14 @@ function SalaryForm({
             </strong>
           </div>
           <p className="muted small-copy">
-            Tarifsiz qeydlər bu ayara əsasən hesablanacaq. Əvvəldən tarifi olan
-            qeydlərin məbləği qorunur.
+            Bu ayın qeydləri rəsmi norma və daxil etdiyin maaşa görə yenidən
+            hesablanır. Digər aylar dəyişmir.
           </p>
-          {existing > 0 && (
-            <label className="checkbox warning-checkbox">
-              <input
-                type="checkbox"
-                checked={apply}
-                onChange={(e) => setApply(e.target.checked)}
-              />
-              Bu ayın əvvəlcədən tarifi olan {existing} qeydini də yeni maaşa
-              görə yenidən hesabla
-            </label>
+          {!norm && (
+            <p className="form-error" role="alert">
+              Bu il üçün təsdiqlənmiş norma hazırda tətbiqdə yoxdur. Rəsmi
+              təqvim əlavə edilənədək maaş üzrə hesablama aparılmır.
+            </p>
           )}
           {error && (
             <p className="form-error" role="alert">
@@ -1248,7 +1306,7 @@ function SalaryForm({
           <button type="button" className="button secondary" onClick={close}>
             Ləğv et
           </button>
-          <button type="submit" className="button primary">
+          <button type="submit" className="button primary" disabled={!norm}>
             <Check size={17} />
             Ayarları saxla
           </button>

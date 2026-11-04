@@ -40,19 +40,22 @@ export function Stats({
     <div className={`stats-grid ${compact ? "compact" : ""}`}>
       <div className="stat-card">
         <div className="stat-label">
-          Overtime müddəti{" "}
+          Ümumi əlavə saat{" "}
           <span className="stat-icon green">
             <Clock3 size={19} />
           </span>
         </div>
         <div className="stat-value">
-          {formatDuration(minutes)} <small>saat</small>
+          {Number((minutes / 60).toFixed(2))
+            .toString()
+            .replace(".", ",")}{" "}
+          <small>saat</small>
         </div>
         <p>Faktiki işlənmiş vaxt</p>
       </div>
       <div className="stat-card">
         <div className="stat-label">
-          Hesablanan məbləğ{" "}
+          Ümumi məbləğ{" "}
           <span className="stat-icon amber">
             <Coins size={19} />
           </span>
@@ -311,7 +314,10 @@ export function Breakdown({
                   {name}
                 </span>
                 <strong>
-                  {formatDuration(minutes)} <small>saat</small>
+                  {Number((minutes / 60).toFixed(2))
+                    .toString()
+                    .replace(".", ",")}{" "}
+                  <small>saat</small>
                 </strong>
               </div>
               <div className="progress">

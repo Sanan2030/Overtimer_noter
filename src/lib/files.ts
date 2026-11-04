@@ -1,7 +1,13 @@
+import type { Worksheet, Row } from "exceljs";
+import { getWorkNorm, WORK_SCHEDULE } from "./work-calendar";
 import {
   amount,
   AppData,
   durationMinutes,
+  displayDate,
+  hourlyRate,
+  localDate,
+  monthLabel,
   emptyData,
   Entry,
   entryRate,
@@ -111,23 +117,199 @@ function excelDuration(value: unknown): number | null {
     throw new Error("Müddət saat:dəqiqə formatında olmalıdır.");
   return Number(match[1]) * 60 + Number(match[2]);
 }
+export const REPORT_HEADER_ROW = 6;
+const REPORT_COLORS = {
+  green: "FF14523E",
+  pale: "FFE9F3EE",
+  stripe: "FFF6F9F7",
+  text: "FF243D31",
+  border: "FFDFE8E2",
+};
+
 export async function createWorkbook(
   data: AppData,
   entries: Entry[] = data.entries,
 ): Promise<Uint8Array> {
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Overtime";
+  workbook.creator = "ArtıSaat";
+  workbook.subject = "Əlavə iş saatları və məbləğlər";
   workbook.created = new Date();
-  const sheet = workbook.addWorksheet("Overtime qeydləri", {
-    views: [{ state: "frozen", ySplit: 1 }],
-  });
-  sheet.addRow(EXCEL_HEADERS);
-  for (const entry of [...entries].sort(
+  workbook.calcProperties.fullCalcOnLoad = true;
+  const sorted = [...entries].sort(
     (a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
-  )) {
+  );
+  const dates = sorted.map((entry) => entry.date);
+  const period = dates.length
+    ? `${displayDate(dates[0])} — ${displayDate(dates[dates.length - 1])}`
+    : "Qeyd yoxdur";
+  const employees = [
+    ...new Set(entries.map((entry) => entry.employee).filter(Boolean)),
+  ];
+  const owner = employees.length
+    ? `Əməkdaş: ${employees.join(", ")}`
+    : "Şəxsi əlavə iş hesabatı";
+  const totalMinutes = entries.reduce(
+    (sum, entry) => sum + durationMinutes(entry),
+    0,
+  );
+  const totalMoney = entries.reduce(
+    (sum, entry) => sum + (amount(entry, data.months) ?? 0),
+    0,
+  );
+
+  // The first sheet is a compact report. The second retains all 17 original columns.
+  const summary = workbook.addWorksheet("Aylıq yekun", {
+    views: [
+      { state: "frozen", ySplit: 6, showGridLines: false, zoomScale: 95 },
+    ],
+  });
+  const widths = [23, 20, 16, 22, 23, 13, 22, 18];
+  widths.forEach((width, index) => {
+    summary.getColumn(index + 1).width = width;
+  });
+  reportTitle(summary, 8, "ARTISAAT · AYLIQ HESABAT", period, owner);
+  summary.mergeCells("A5:H5");
+  summary.getCell("A5").value =
+    "Saatlıq tarif = net maaş ÷ həmin ayın rəsmi norması · " + WORK_SCHEDULE;
+  summary.getCell("A5").font = {
+    name: "Calibri",
+    size: 10,
+    color: { argb: "FF6B7D72" },
+  };
+  summary.getRow(5).height = 25;
+  summary.getRow(6).values = [
+    "Ay",
+    "Net maaş (AZN)",
+    "Norma (saat)",
+    "Saatlıq tarif (AZN)",
+    "Overtime (saat:dəqiqə)",
+    "Qeyd sayı",
+    "Məbləğ (AZN)",
+    "Tarifsiz qeydlər",
+  ];
+  styleHeader(summary.getRow(6));
+  const groups = new Map<string, Entry[]>();
+  sorted.forEach((entry) => {
+    const key = entry.date.slice(0, 7);
+    groups.set(key, [...(groups.get(key) ?? []), entry]);
+  });
+  for (const [month, rows] of groups) {
+    const norm = getWorkNorm(month);
+    const row = summary.addRow([
+      monthLabel(month),
+      data.months[month]?.salary ?? null,
+      norm?.hours ?? null,
+      hourlyRate(data.months[month], month),
+      rows.reduce((sum, e) => sum + durationMinutes(e), 0) / 1440,
+      rows.length,
+      rows.reduce((sum, e) => sum + (amount(e, data.months) ?? 0), 0),
+      rows.filter((e) => amount(e, data.months) === null).length,
+    ]);
+    styleDataRow(row, groups.size > 0 && row.number % 2 === 1);
+    row.height = 34;
+  }
+  [2, 4, 7].forEach((index) => {
+    summary.getColumn(index).numFmt = "#,##0.00";
+  });
+  summary.getColumn(5).numFmt = "[h]:mm";
+  const summaryEnd = summary.rowCount;
+  summary.autoFilter = `A6:H${summaryEnd}`;
+  const summaryTotal = summary.getRow(summaryEnd + 1);
+  summary.mergeCells(summaryTotal.number, 1, summaryTotal.number, 4);
+  summaryTotal.getCell(1).value = "YEKUN";
+  setSum(summaryTotal.getCell(5), "E", summaryEnd, totalMinutes / 1440);
+  setSum(summaryTotal.getCell(6), "F", summaryEnd, entries.length);
+  setSum(summaryTotal.getCell(7), "G", summaryEnd, totalMoney);
+  setSum(
+    summaryTotal.getCell(8),
+    "H",
+    summaryEnd,
+    entries.filter((e) => amount(e, data.months) === null).length,
+  );
+  styleTotal(summaryTotal);
+  let noteRow = summaryTotal.number + 2;
+  summary.mergeCells(noteRow, 1, noteRow, 8);
+  summary.getCell(noteRow, 1).value =
+    "Tarifsiz qeydlər saat yekununa daxildir; məbləğə daxil edilmir. Əmsal faktiki iş müddətini dəyişmir.";
+  summary.getCell(noteRow, 1).font = {
+    name: "Calibri",
+    size: 10,
+    color: { argb: "FF6B7D72" },
+  };
+  summary.getCell(noteRow, 1).alignment = {
+    wrapText: true,
+    vertical: "middle",
+  };
+  summary.getRow(noteRow).height = 30;
+  for (const year of [
+    ...new Set(sorted.map((entry) => entry.date.slice(0, 4))),
+  ]) {
+    const norm = getWorkNorm(`${year}-01`);
+    if (!norm) continue;
+    noteRow++;
+    summary.mergeCells(noteRow, 1, noteRow, 8);
+    summary.getCell(noteRow, 1).value = {
+      text: `Norma mənbəyi: ƏƏSMN — ${year} istehsalat təqvimi`,
+      hyperlink: norm.sourceUrl,
+    };
+    summary.getCell(noteRow, 1).font = {
+      name: "Calibri",
+      size: 10,
+      underline: true,
+      color: { argb: REPORT_COLORS.green },
+    };
+    summary.getRow(noteRow).height = 23;
+  }
+  configurePrint(summary, 8, noteRow, false);
+
+  const sheet = workbook.addWorksheet("Overtime qeydləri", {
+    views: [
+      {
+        state: "frozen",
+        xSplit: 3,
+        ySplit: 6,
+        showGridLines: false,
+        zoomScale: 85,
+      },
+    ],
+  });
+  [7, 12, 24, 24, 13, 20, 14, 11, 11, 23, 20, 20, 50, 23, 10, 20, 21].forEach(
+    (width, index) => {
+      sheet.getColumn(index + 1).width = width;
+    },
+  );
+  reportTitle(sheet, 17, "ARTISAAT · ƏLAVƏ İŞ QEYDLƏRİ", period, owner);
+  for (const [from, to, label] of [
+    [1, 2, "DÖVR"],
+    [3, 4, "ƏMƏKDAŞ"],
+    [5, 6, "MÜŞTƏRİ VƏ LAYİHƏ"],
+    [7, 12, "İŞ VAXTI"],
+    [13, 14, "TAPŞIRIQ"],
+    [15, 17, "HESABLAMA"],
+  ] as const) {
+    sheet.mergeCells(5, from, 5, to);
+    const cell = sheet.getCell(5, from);
+    cell.value = label;
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: REPORT_COLORS.pale },
+    };
+    cell.font = {
+      name: "Calibri",
+      bold: true,
+      size: 10,
+      color: { argb: REPORT_COLORS.green },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  }
+  sheet.getRow(5).height = 26;
+  sheet.getRow(6).values = EXCEL_HEADERS;
+  styleHeader(sheet.getRow(6));
+  for (const entry of sorted) {
     const [year, month] = entry.date.split("-").map(Number);
-    sheet.addRow([
+    const row = sheet.addRow([
       year,
       MONTHS[month - 1],
       entry.employee,
@@ -146,80 +328,192 @@ export async function createWorkbook(
       entryRate(entry, data.months),
       amount(entry, data.months),
     ]);
+    styleDataRow(row, row.number % 2 === 1);
+    const lines = Math.max(
+      ...[entry.subject, entry.reason, entry.employee, entry.manager].map(
+        (text) =>
+          text
+            .split("\n")
+            .reduce(
+              (sum, line) => sum + Math.max(1, Math.ceil(line.length / 42)),
+              0,
+            ),
+      ),
+    );
+    row.height = Math.min(200, Math.max(34, lines * 15 + 12));
+    [1, 2, 7, 8, 9, 12, 15].forEach((index) => {
+      row.getCell(index).alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+    });
+    [16, 17].forEach((index) => {
+      row.getCell(index).alignment = {
+        horizontal: "right",
+        vertical: "middle",
+      };
+    });
   }
-  const widths = [
-    9, 15, 25, 25, 16, 20, 15, 13, 13, 23, 20, 23, 58, 23, 10, 22, 20,
-  ];
-  widths.forEach((width, index) => {
-    sheet.getColumn(index + 1).width = width;
-  });
   sheet.getColumn(7).numFmt = "dd.mm.yyyy";
-  [8, 9].forEach((c) => {
-    sheet.getColumn(c).numFmt = "hh:mm";
+  [8, 9].forEach((index) => {
+    sheet.getColumn(index).numFmt = "hh:mm";
   });
   sheet.getColumn(12).numFmt = "[h]:mm";
-  [16, 17].forEach((c) => {
-    sheet.getColumn(c).numFmt = "0.00";
+  sheet.getColumn(15).numFmt = '0"x"';
+  [16, 17].forEach((index) => {
+    sheet.getColumn(index).numFmt = "#,##0.00";
   });
-  sheet.autoFilter = { from: "A1", to: "Q1" };
-  sheet.eachRow((row, number) => {
-    row.alignment = { vertical: "middle", wrapText: true };
-    if (number > 1) {
-      row.height = 36;
-      if (number % 2 === 0)
-        row.eachCell((cell) => {
-          cell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: "FFF1F6F5" },
-          };
-        });
-    }
-  });
-  styleHeader(sheet.getRow(1));
-  const summary = workbook.addWorksheet("Aylıq yekun");
-  summary.addRow([
-    "Ay",
-    "Qeyd sayı",
-    "Faktiki müddət",
-    "Məbləğ (AZN)",
-    "Tarifsiz qeydlər",
-  ]);
-  const groups = new Map<string, Entry[]>();
-  entries.forEach((entry) => {
-    const month = entry.date.slice(0, 7);
-    groups.set(month, [...(groups.get(month) ?? []), entry]);
-  });
-  for (const [month, rows] of [...groups].sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    summary.addRow([
-      month,
-      rows.length,
-      rows.reduce((s, e) => s + durationMinutes(e), 0) / 1440,
-      rows.reduce((s, e) => s + (amount(e, data.months) ?? 0), 0),
-      rows.filter((e) => amount(e, data.months) === null).length,
-    ]);
-  }
-  summary.columns.forEach((c) => {
-    c.width = 23;
-  });
-  summary.getColumn(3).numFmt = "[h]:mm";
-  summary.getColumn(4).numFmt = "0.00";
-  styleHeader(summary.getRow(1));
+  const end = sheet.rowCount;
+  sheet.autoFilter = `A6:Q${end}`;
+  const total = sheet.getRow(end + 1);
+  // Leave G:I empty so the total cannot be mistaken for an imported work record.
+  sheet.mergeCells(total.number, 1, total.number, 6);
+  total.getCell(1).value = "CƏMİ";
+  sheet.mergeCells(total.number, 10, total.number, 11);
+  total.getCell(10).value = "Müddət";
+  setSum(total.getCell(12), "L", end, totalMinutes / 1440);
+  sheet.mergeCells(total.number, 13, total.number, 16);
+  total.getCell(13).value = "Ümumi məbləğ (AZN)";
+  setSum(total.getCell(17), "Q", end, totalMoney);
+  styleTotal(total);
+  configurePrint(sheet, 17, total.number, true);
   return new Uint8Array(await workbook.xlsx.writeBuffer());
 }
-function styleHeader(row: import("exceljs").Row) {
-  row.height = 42;
+function reportTitle(
+  sheet: Worksheet,
+  columns: number,
+  title: string,
+  period: string,
+  owner: string,
+) {
+  sheet.mergeCells(1, 1, 1, columns);
+  const cell = sheet.getCell(1, 1);
+  cell.value = title;
+  cell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: REPORT_COLORS.green },
+  };
+  cell.font = {
+    name: "Calibri",
+    size: 18,
+    bold: true,
+    color: { argb: "FFFFFFFF" },
+  };
+  cell.alignment = { vertical: "middle", indent: 1 };
+  sheet.getRow(1).height = 41;
+  for (const [row, value] of [
+    [2, `Hesabat dövrü: ${period}`],
+    [3, `${owner} · Hazırlanma: ${displayDate(localDate())}`],
+  ] as const) {
+    sheet.mergeCells(row, 1, row, columns);
+    const meta = sheet.getCell(row, 1);
+    meta.value = value;
+    meta.font = { name: "Calibri", size: 11, color: { argb: "FF607468" } };
+    meta.alignment = { vertical: "middle", wrapText: true };
+    sheet.getRow(row).height = 25;
+  }
+  sheet.getRow(4).height = 12;
+}
+function styleHeader(row: Row) {
+  row.height = 43;
   row.eachCell((cell) => {
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF133C35" },
+      fgColor: { argb: REPORT_COLORS.green },
     };
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-    cell.alignment = { vertical: "middle", wrapText: true };
+    cell.font = {
+      name: "Calibri",
+      bold: true,
+      size: 10,
+      color: { argb: "FFFFFFFF" },
+    };
+    cell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+    cell.border = {
+      bottom: { style: "thin", color: { argb: REPORT_COLORS.border } },
+    };
   });
+}
+function styleDataRow(row: Row, stripe: boolean) {
+  row.eachCell({ includeEmpty: true }, (cell) => {
+    cell.font = {
+      name: "Calibri",
+      size: 11,
+      color: { argb: REPORT_COLORS.text },
+    };
+    cell.alignment = { vertical: "middle", wrapText: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: stripe ? REPORT_COLORS.stripe : "FFFFFFFF" },
+    };
+    cell.border = {
+      bottom: { style: "hair", color: { argb: REPORT_COLORS.border } },
+    };
+  });
+}
+function styleTotal(row: Row) {
+  row.height = 34;
+  row.eachCell({ includeEmpty: true }, (cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: REPORT_COLORS.pale },
+    };
+    cell.font = {
+      name: "Calibri",
+      bold: true,
+      size: 11,
+      color: { argb: REPORT_COLORS.green },
+    };
+    cell.alignment = {
+      vertical: "middle",
+      horizontal: typeof cell.value === "string" ? "left" : "right",
+      wrapText: true,
+    };
+    cell.border = { top: { style: "thin", color: { argb: "FFB7D1C2" } } };
+  });
+}
+function setSum(
+  cell: import("exceljs").Cell,
+  column: string,
+  end: number,
+  result: number,
+) {
+  cell.value =
+    end >= 7 ? { formula: `SUM(${column}7:${column}${end})`, result } : 0;
+}
+function configurePrint(
+  sheet: Worksheet,
+  columns: number,
+  end: number,
+  wide: boolean,
+) {
+  // A3 is ECMA-376 paper size 8; ExcelJS's numeric enum omits this supported value.
+  sheet.pageSetup = {
+    paperSize: (wide ? 8 : 9) as import("exceljs").PaperSize,
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    printTitlesRow: "1:6",
+    margins: {
+      left: 0.25,
+      right: 0.25,
+      top: 0.35,
+      bottom: 0.35,
+      header: 0.15,
+      footer: 0.15,
+    },
+    printArea: `A1:${String.fromCharCode(64 + columns)}${end}`,
+  };
+  sheet.headerFooter = { oddFooter: "&LArtıSaat&CƏlavə iş hesabatı&R&P / &N" };
 }
 export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
   if (buffer.byteLength > MAX_FILE_SIZE)
@@ -235,7 +529,12 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
     for (let i = 1; i <= Math.min(sheet.rowCount, 30); i++) {
       const map = new Map<string, number>();
       sheet.getRow(i).eachCell((cell, column) => {
-        if (str(cell.value)) map.set(normalize(cell.value), column);
+        // Summary/total formulas are not header labels and may lack cached results.
+        try {
+          if (str(cell.value)) map.set(normalize(cell.value), column);
+        } catch {
+          /* Continue looking for the actual column headers. */
+        }
       });
       if (["tarix", "başlanma", "bitmə"].every((key) => map.has(key))) {
         columns = map;

@@ -4,8 +4,8 @@ ArtıSaat əməkdaşın əlavə iş saatlarını qeyd etməsi və qarşılığı
 
 ## Tətbiqin etdiyi işlər
 
-1. Hər ayın net maaşını və norma iş saatını saxlayır, saatlıq tarifi hesablayır.
-2. Tarix, başlanma və bitmə saatından əlavə iş müddətini çıxarır. Fasiləni nəzərə alır, gecəni keçən qeydləri qəbul edir.
+1. Hər ayın net maaşını saxlayır; norma iş saatını ƏƏSMN-nin rəsmi təqvimindən tarixə görə avtomatik seçir və saatlıq tarifi hesablayır.
+2. Tarix, başlanma və bitmə saatından əlavə iş müddətini çıxarır. Yeni formada fasilə seçimi yoxdur; gecəni keçən qeydləri qəbul edir.
 3. Standart 1x, seçilə bilən 2x və 3x əmsalla hər qeydin məbləğini hesablayır.
 4. Qeydləri brauzerdə avtomatik saxlayır; redaktə, kopyalama, silmə, ay/mətn/layihə/əmsal filtrləri var.
 5. Saat və məbləğlərin aylıq yekununu, aylıq trendi, layihə/müştəri/səbəb/iş mühiti/həftə günləri/əmsal bölgüsünü və əvvəlki ayla müqayisəni göstərir.
@@ -15,29 +15,29 @@ Bu versiyada giriş, ortaq hesab, rəhbər paneli, təsdiq və ödəniş statusu
 
 ## Məlumat xanaları
 
-| Bölmə         | İstifadəçinin daxil etdiyi                                                                 | Avtomatik hesablanan           |
-| ------------- | ------------------------------------------------------------------------------------------ | ------------------------------ |
-| Aylıq maaş    | Ay/il, net maaş (AZN), ayın norma iş saatı                                                 | Saatlıq tarif                  |
-| Əsas qeyd     | Tarix, başlanma saatı, bitmə saatı, əmsal (1x/2x/3x), istəyə görə fasilə dəqiqəsi və mövzu | İl, ay, faktiki müddət, məbləğ |
-| Əlavə məlumat | Əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, səbəb                 | —                              |
+| Bölmə         | İstifadəçinin daxil etdiyi                                                 | Avtomatik hesablanan           |
+| ------------- | -------------------------------------------------------------------------- | ------------------------------ |
+| Aylıq maaş    | Ay/il, net maaş (AZN)                                                      | Saatlıq tarif                  |
+| Əsas qeyd     | Tarix, başlanma saatı, bitmə saatı, əmsal (1x/2x/3x), istəyə görə mövzu    | İl, ay, faktiki müddət, məbləğ |
+| Əlavə məlumat | Əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, səbəb | —                              |
 
-“İcra günü statusu” işin qeyri-iş saatı, istirahət günü və ya bayram günü olmasını bildirir. Təsdiq və ödəniş statusu deyil. Əlavə məlumatlar açılıb-bağlanan bölmədə olmalıdır. Əməkdaş, rəhbər, müştəri, layihə və iş mühiti növbəti qeyd üçün yadda saxlanıla bilər.
+“İcra günü statusu” işin qeyri-iş saatı, istirahət günü və ya bayram günü olmasını bildirir. Təsdiq və ödəniş statusu deyil. Bütün məlumat xanaları bir pəncərədə açıq olmalıdır; onları ayrıca açılan bölmədə gizlətməyin. Əməkdaş, rəhbər, müştəri, layihə və iş mühiti növbəti qeyd üçün yadda saxlanıla bilər.
 
 ## Hesablama
 
 ```text
 Saatlıq tarif = net maaş / ayın norma iş saatı
-Məbləğ = (iş dəqiqəsi − fasilə dəqiqəsi) / 60 × saatlıq tarif × əmsal
+Məbləğ = iş dəqiqəsi / 60 × saatlıq tarif × əmsal
 ```
 
-Məsələn, 1 200 AZN / 160 saat = 7,50 AZN/saat. 18:00–20:00 aralığı 1x üçün 15,00 AZN, 2x üçün 30,00 AZN, 3x üçün 45,00 AZN edir. Faktiki saat əmsaldan asılı olaraq artmır. Hər ayın maaşı ayrıdır; əvvəlki tariflər ayrıca təsdiq olmadan dəyişdirilmir.
+Məsələn, 1 200 AZN / 160 saat = 7,50 AZN/saat. 18:00–20:00 aralığı 1x üçün 15,00 AZN, 2x üçün 30,00 AZN, 3x üçün 45,00 AZN edir. Faktiki saat əmsaldan asılı olaraq artmır. Hər ayın maaşı ayrıdır; həmin ayın qeydləri maaş və rəsmi normaya görə yenidən hesablanır.
 
 ## Sadə ekran quruluşu
 
-- Üstdə kiçik ArtıSaat adı və avtomatik saxlama göstəricisi.
+- Üstdə ArtıSaat adı, mərkəzdə menyu, avtomatik saxlama göstəricisi və açıq/tünd rejim düyməsi.
 - Üç tab: **Qeydlərim**, **Analiz**, **Fayllar**. Yan menyu yoxdur.
 - Qeydlərim: ay seçimi, Aylıq maaş düyməsi, cəmi saat və cəmi məbləğ, Yeni qeyd düyməsi və qeydlər. Əsas ekranda qrafik yoxdur.
-- Yeni qeyd: tarix, iki saat, əmsal, fasilə və mövzu; müddət və məbləğ dərhal görünür. Digər xanalar “Ətraflı məlumatlar” altında açılır.
+- Yeni qeyd: tarix, iki saat, əmsal, mövzu; müddət və məbləğ dərhal görünür. Digər məlumat xanaları da eyni pəncərədə açıq görünür.
 - Qeydlər masaüstündə sadə cədvəl, telefonda asan oxunan kartlardır.
 - Analiz: iki yekun göstərici, aylıq trend və layihə bölgüsü. Digər qrafiklər “Daha ətraflı analiz” altında açılır.
 - Fayllar: JSON endir, Excel endir, Fayl seç. İdxalın əvvəlcədən icmalı və təsdiqi saxlanılır.
@@ -65,13 +65,10 @@ Use three simple top tabs: “Qeydlərim”, “Analiz”, and “Fayllar”.
    and edit/copy/delete actions. Use readable cards on phones. Keep search
    visible and project/multiplier filters behind a small expandable control.
 2. New-record form: date, start time, end time, multiplier segmented control
-   (1x default, 2x, 3x), optional unpaid break in minutes, and optional subject.
-   Display calculated duration and amount immediately. Hide employee, manager,
-   customer, project, day type, work environment, and reason under
-   “Ətraflı məlumatlar”. Provide clear “Qeydi saxla” and “Ləğv et” buttons.
-3. Monthly salary settings: month/year, monthly net salary in AZN, normal
-   monthly work hours, and a read-only hourly rate.
-   Amount = worked hours after breaks × (net salary / monthly normal hours)
+   (1x default, 2x, 3x), optional subject. There is no break field.
+   Display calculated duration and amount immediately. Show employee, manager, customer, project, day type, work environment, and reason in the same form, always expanded. Provide clear “Qeydi saxla” and “Ləğv et” buttons.
+3. Monthly salary settings: month/year, monthly net salary in AZN, a read-only official monthly norm from the Azerbaijan Ministry of Labour production calendar, and a read-only hourly rate. The user cannot enter the monthly hours.
+   Amount = worked hours × (net salary / monthly normal hours)
    × multiplier. Two actual hours at 3x remain two hours in time summaries.
 4. Analiz: monthly hours/amount, a monthly trend, and project breakdown.
    Put customer, reason, environment, weekday, multiplier, and previous-month
@@ -80,7 +77,7 @@ Use three simple top tabs: “Qeydlərim”, “Analiz”, and “Fayllar”.
    and import an existing XLSX. Show an import preview before confirmation.
 
 Include empty, populated, validation-error, missing-salary, and import-preview
-states. Support overnight shifts and unpaid breaks. Show a small auto-save
+states. Support overnight shifts with no break selector. Show a small auto-save
 indicator. No login, subscription, team management, approval, or payment
 status: each person's data stays in their own browser. Device-to-device
 transfer uses JSON. Do not add features outside this scope.
@@ -93,3 +90,7 @@ Deliver desktop and mobile screens with a consistent, restrained design.
 ```
 
 Vizual ekranlar üçün Google Stitch, işlək Next.js/React interfeysi üçün v0, dizaynı Figma daxilində davam etdirmək üçün Figma Make istifadə edilə bilər. Mövcud funksiyaları saxlayan işlək kod istənilirsə bu promptu v0-da mövcud layihə ilə birlikdə istifadə etmək uyğundur.
+
+## Son təsdiqlənmiş dizayn
+
+İlk yüklənmiş Stitch ZIP dizaynı əsasdır: mərkəzdə menyu, açıq bənövşəyi fon, ağ kartlar, yaşıl vurğu; açıq/tünd rejim. Dizayndakı fasilə sütunu və 1.5x nümunələri tətbiq edilmir: istifadəçinin tələbi 1x/2x/3x və fasiləsiz yeni qeyddir.

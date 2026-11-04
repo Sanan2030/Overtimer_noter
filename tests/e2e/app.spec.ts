@@ -2,17 +2,13 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
 
-async function setSalary(
-  page: Page,
-  month = "2026-10",
-  salary = "1200",
-  hours = "160",
-) {
+async function setSalary(page: Page, month = "2026-10", salary = "1320") {
   await page.getByRole("button", { name: "Aylıq maaş", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Ay", { exact: true }).fill(month);
   await dialog.getByLabel("Net maaş (AZN)").fill(salary);
-  await dialog.getByLabel("Norma iş saatı").fill(hours);
+  await expect(dialog.locator(".norm-note")).toContainText("saat");
+  await expect(dialog.locator('input[type="number"]')).toHaveCount(1);
   await dialog.getByRole("button", { name: "Ayarları saxla" }).click();
   await expect(dialog).not.toBeVisible();
 }
@@ -53,7 +49,7 @@ test("calculates overtime, persists after reload and exports a complete JSON bac
   const download = await downloadPromise;
   const backup = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(backup.entries).toHaveLength(1);
-  expect(backup.months["2026-10"]).toEqual({ salary: 1200, hours: 160 });
+  expect(backup.months["2026-10"]).toEqual({ salary: 1320, hours: 176 });
   expect(errors).toEqual([]);
 });
 
@@ -124,9 +120,13 @@ test("imports original Excel, prices old records, exports matching columns and s
   const download = await downloadPromise;
   const exported = new ExcelJS.Workbook();
   await exported.xlsx.readFile((await download.path())!);
-  expect(exported.worksheets[0].getCell("Q2").value).toBe(22.5);
-  expect(exported.worksheets[0].getCell("M1").value).toBe("Mövzu");
-  expect(exported.worksheets[1].getCell("B2").value).toBe(1);
+  expect(exported.getWorksheet("Overtime qeydləri")!.getCell("Q7").value).toBe(
+    22.5,
+  );
+  expect(exported.getWorksheet("Overtime qeydləri")!.getCell("M6").value).toBe(
+    "Mövzu",
+  );
+  expect(exported.getWorksheet("Aylıq yekun")!.getCell("F7").value).toBe(1);
 });
 
 test("JSON restore survives navigation and repeated imports, each browser starts isolated", async ({
@@ -208,22 +208,21 @@ test("editing, overlapping times, filters and deletion behave correctly", async 
   ).toBeVisible();
 });
 
-test("monthly rate changes preserve history unless explicitly recalculated", async ({
+test("official monthly norms reprice only the selected month's records", async ({
   page,
 }) => {
   await page.goto("/");
   await setSalary(page);
-  await addEntry(page, "Köhnə tarif");
-  await setSalary(page, "2026-10", "1600");
+  await addEntry(page, "Oktyabr işi");
+  await setSalary(page, "2026-03", "1110");
+  await addEntry(page, "Mart işi");
+  await setSalary(page, "2026-10", "1760");
+  await page.getByLabel("Hesabat dövrü").selectOption("all");
   await expect(
-    page.getByRole("row").filter({ hasText: "Köhnə tarif" }),
-  ).toContainText("15,00");
-  await page.getByRole("button", { name: "Aylıq maaş", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("checkbox").check();
-  await dialog.getByRole("button", { name: "Ayarları saxla" }).click();
+    page.getByRole("row").filter({ hasText: "Oktyabr işi" }),
+  ).toContainText("20,00");
   await expect(
-    page.getByRole("row").filter({ hasText: "Köhnə tarif" }),
+    page.getByRole("row").filter({ hasText: "Mart işi" }),
   ).toContainText("20,00");
 });
 
@@ -237,16 +236,16 @@ test("mobile layout has no page overflow and supports a new overnight record", a
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Başlanma", { exact: true }).fill("22:00");
   await dialog.getByLabel("Bitmə", { exact: true }).fill("02:00");
-  await dialog.getByLabel("Fasilə (dəqiqə)").fill("30");
+  await expect(dialog.getByLabel("Fasilə (dəqiqə)")).toHaveCount(0);
   await dialog.getByRole("button", { name: "2x", exact: true }).click();
   await dialog.getByLabel("Mövzu", { exact: true }).fill("Gecə işi");
-  await expect(dialog).toContainText("52,50");
+  await expect(dialog).toContainText("60,00");
   await dialog
     .getByRole("button", { name: "Qeydi saxla", exact: true })
     .click();
   await expect(
     page.getByRole("row").filter({ hasText: "Gecə işi" }),
-  ).toContainText("52,50");
+  ).toContainText("60,00");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -336,7 +335,7 @@ test("blocked browser storage warns clearly and JSON can still rescue in-memory 
   const download = await downloadPromise;
   const backup = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(backup.entries[0].subject).toBe("Yaddaş dolu olduqda qeyd");
-  expect(backup.months["2026-10"].salary).toBe(1200);
+  expect(backup.months["2026-10"].salary).toBe(1320);
 });
 
 test("corrupt stored data is preserved until an explicitly confirmed restore", async ({
@@ -386,4 +385,48 @@ test("corrupt stored data is preserved until an explicitly confirmed restore", a
   await expect(
     page.getByRole("button", { name: "Yeni qeyd", exact: true }),
   ).toBeEnabled();
+});
+
+test("March salary uses 111 official hours and all record fields are in one window", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await setSalary(page, "2026-03", "1200");
+  await page.getByRole("button", { name: "Yeni qeyd", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".norm-note")).toContainText("111 saat");
+  await expect(dialog.getByLabel("Əməkdaş", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Şöbə müdiri", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Layihə", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Fasilə (dəqiqə)")).toHaveCount(0);
+  await expect(dialog.locator("details")).toHaveCount(0);
+  await dialog.getByLabel("Mövzu", { exact: true }).fill("Mart norması");
+  await expect(dialog.locator(".calculation")).toContainText("21,62");
+  await dialog
+    .getByRole("button", { name: "Qeydi saxla", exact: true })
+    .click();
+  await expect(
+    page.getByRole("row").filter({ hasText: "Mart norması" }),
+  ).toContainText("21,62");
+});
+
+test("dark mode is saved and applies to forms without affecting records", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Tünd rejimə keç", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await setSalary(page);
+  await addEntry(page, "Tünd rejimdə qeyd");
+  await expect(
+    page.getByRole("row").filter({ hasText: "Tünd rejimdə qeyd" }),
+  ).toContainText("15,00");
+  await page
+    .getByRole("button", { name: "Açıq rejimə keç", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });

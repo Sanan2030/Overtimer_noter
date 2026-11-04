@@ -20,7 +20,7 @@ const entry = (overrides: Partial<ReturnType<typeof newEntry>> = {}) => ({
 });
 
 test("monthly net salary, minutes and each multiplier calculate correctly", () => {
-  const months = { "2026-10": { salary: 1200, hours: 160 } };
+  const months = { "2026-10": { salary: 1320, hours: 160 } };
   for (const multiplier of [1, 2, 3] as const)
     assert.equal(
       amount(entry({ end: "19:30", multiplier }), months),
@@ -38,7 +38,7 @@ test("overnight shifts deduct breaks and retain their start month", () => {
   assert.equal(durationMinutes(row), 210);
   assert.equal(
     amount(row, {
-      "2026-10": { salary: 1200, hours: 160 },
+      "2026-10": { salary: 1320, hours: 160 },
       "2026-11": { salary: 2400, hours: 160 },
     }),
     52.5,
@@ -49,10 +49,10 @@ test("missing rates remain unpriced, zero salary remains a valid rate", () => {
   assert.equal(amount(entry(), {}), null);
   assert.equal(amount(entry(), { "2026-10": { salary: 0, hours: 160 } }), 0);
 });
-test("snapshot rates take precedence over later monthly changes", () => {
+test("monthly salaries use official norms rather than a legacy snapshot rate", () => {
   assert.equal(
-    amount(entry({ rate: 10 }), { "2026-10": { salary: 1200, hours: 160 } }),
-    20,
+    amount(entry({ rate: 10 }), { "2026-10": { salary: 1320, hours: 160 } }),
+    15,
   );
 });
 test("equal times, malformed times and excessive breaks fail", () => {
@@ -137,16 +137,16 @@ test("JSON validation rejects invalid amounts, prototype month keys and duplicat
 test("merge is repeatable, retains current settings and freezes imported rates", () => {
   const current = {
     ...emptyData(),
-    months: { "2026-10": { salary: 1200, hours: 160 } },
+    months: { "2026-10": { salary: 1320, hours: 160 } },
   };
   const imported = {
     ...emptyData(),
-    months: { "2026-10": { salary: 1600, hours: 160 } },
+    months: { "2026-10": { salary: 1760, hours: 160 } },
     entries: [entry()],
   };
   const first = mergeData(current, imported);
   assert.equal(first.added, 1);
-  assert.equal(first.data.months["2026-10"].salary, 1200);
+  assert.equal(first.data.months["2026-10"].salary, 1320);
   assert.equal(first.data.entries[0].rate, 10);
   const second = mergeData(first.data, imported);
   assert.equal(second.added, 0);
@@ -166,7 +166,7 @@ test("calculation rounds money only after multiplying full precision rate", () =
     amount(entry({ end: "18:01", multiplier: 3 }), {
       "2026-10": { salary: 1234, hours: 168 },
     }),
-    0.37,
+    0.35,
   );
 });
 test("money always uses the Azerbaijani decimal separator", () => {

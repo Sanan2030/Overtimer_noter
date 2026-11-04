@@ -1,14 +1,10 @@
 # ArtıSaat
 
-Azərbaycan dilində əlavə iş saatları və məbləğlərin uçotu. Next.js / React / TypeScript ilə hazırlanıb; Vercel-də işləyir. Backend, hesabla giriş, xarici verilənlər bazası və API açarı tələb etmir.
-
-İnterfeys üç bölmədən ibarətdir: **Qeydlərim**, **Analiz**, **Fayllar**. Əsas ekran yalnız saat/məbləğ yekununu və qeydləri göstərir; əlavə xanalar, filtrlər və detallı analiz lazım olduqda açılır. Telefonda qeydlər kart formasındadır.
-
-Funksiyalar, bütün məlumat xanaları və başqa AI ilə dizayn hazırlamaq üçün hazır prompt: [Dizayn tapşırığı](DESIGN_BRIEF.md).
+Azərbaycan dilində əlavə iş saatları və məbləğlərin uçotu. Next.js / React / TypeScript; Vercel üçün hazırdır. Hesabla giriş, database və tətbiq API açarı tələb olunmur.
 
 ## Başlatmaq
 
-Node.js 22 və ya 24 LTS, npm istifadə edin.
+Node.js 24 LTS və npm:
 
 ```sh
 cd /workspace/Overtimer_noter
@@ -16,63 +12,68 @@ npm ci
 npm run dev
 ```
 
-Production rejimi:
+Production:
 
 ```sh
 npm run build
 npm run start
 ```
 
-## İmkanlar
+## İnterfeys
 
-- Hər ay üçün əl ilə net maaş və norma iş saatı.
-- Tarix, başlanma, bitmə, fasilə; standart 1x və seçilə bilən 2x / 3x.
-- Əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, mövzu və səbəb.
-- Son istifadə edilən əməkdaş və layihə məlumatlarının növbəti qeyd üçün yadda saxlanması.
-- Qeydləri dəyişmək, kopyalamaq, təsdiqlə silmək; tarix, mətn, layihə və əmsal filtrləri.
-- Gecəni keçən işlər və eyni əməkdaşın vaxt aralıqlarının toqquşmasına xəbərdarlıq.
-- Aylıq saat, məbləğ, overtime günləri, gündəlik orta müddət; 6 aylıq trend; əmsal, layihə, müştəri, səbəb, iş mühiti və həftə günləri üzrə analiz; əvvəlki ayla müqayisə.
-- JSON tam ehtiyat nüsxə və bərpa; XLSX idxal və formatlanmış ixrac.
-- Mobil və masaüstü interfeys. Nümunə məlumatlar avtomatik əlavə edilmir.
+Birinci təqdim edilmiş Stitch dizaynı əsas götürülür: mərkəzləşdirilmiş üç menyu (**Qeydlərim**, **Analiz**, **Fayllar**), açıq bənövşəyi fon, ağ kartlar və yaşıl vurğu. Açıq/tünd rejim seçimi brauzerdə `artisaat:theme` açarı ilə saxlanır; ilk açılışda sistemin rəng rejimi nəzərə alınır. Inter şrifti lisenziyası ilə birlikdə lokal verilir.
 
-## Hesablama qaydaları
+Yeni qeyd formasında bütün xanalar bir pəncərədə açıqdır. Fasilə sahəsi və norma saatını əl ilə dəyişmək imkanı yoxdur. İl/ay tarixdən, norma saatı rəsmi təqvimdən gəlir. Qeyd üçün başlanma və bitmə saatlarını istifadəçi daxil edir.
+
+## Rəsmi aylıq norma
+
+ƏƏSMN-nin rəsmi istehsalat təqvimlərindən yoxlanmış **2023–2026** aylıq normları `src/lib/work-calendar.ts` faylındadır. Standart rejim: **beşgünlük, həftədə 40 saat**. Hər ilin rəsmi səhifə və təqvim şəkli linki məlumatla birlikdə saxlanır. 2026 mart norması **111 saat**, 2025 mart norması **110 saatdır**. Aylıq rəqəmlərin cəmi illik norma ilə test olunur.
+
+Tətbiq rəsmi təqvimin yoxlanmış yerli nüsxəsindən istifadə etdiyinə görə internet olmadan da ayı seçdikdə norma avtomatik gəlir. Yeni ilin və ya yenilənmiş təqvimin rəqəmləri rəsmi sənədlə yoxlanıb bu cədvələ əlavə edilməlidir. Təsdiqlənmiş məlumatı olmayan il üçün norma təxmin edilmir və maaş ayarının saxlanması bağlıdır; qeydləri tarifsiz saxlamaq olar.
+
+Rəsmi mənbə: <https://sosial.gov.az/az/faydali/istehsalat-teqvimi>
+
+## Hesablama
 
 ```text
-saatlıq tarif = aylıq net maaş / ayın norma iş saatı
-faktiki müddət = bitmə - başlanma - fasilə
-məbləğ = faktiki dəqiqə / 60 × saatlıq tarif × əmsal
+Saatlıq tarif = ayın net maaşı / həmin ayın rəsmi norma saatı
+Məbləğ = əlavə iş dəqiqəsi / 60 × saatlıq tarif × əmsal
 ```
 
-1 200 AZN maaş və 160 norma saatı üçün tarif 7,50 AZN-dir. 18:00–20:00 qeydi 1x ilə 15,00 AZN, 2x ilə 30,00 AZN, 3x ilə 45,00 AZN edir. Məbləğ hər qeydin sonunda qəpiyə yuvarlaqlaşdırılır; yekun həmin məbləğlərin cəmidir. Faktiki iş saatı əmsala vurulmur.
+Əmsal standart **1x**, seçimlər **2x** və **3x**. Faktiki iş müddəti əmsala vurulmur. 2026 martda 1 200 AZN maaş və 2 saat overtime: `1200 / 111 × 2 = 21,62 AZN`; 2x ilə 43,24 AZN. Məbləğ hər qeyddə qəpiyə yuvarlaqlaşdırılır, yekun həmin məbləğlərin cəmidir.
 
-Bitmə başlanmadan erkəndirsə, növbəti günə aiddir. Eyni başlanma/bitmə qəbul edilmir, bir qeyd 24 saatdan qısadır. Gecəni keçən iş başlanma tarixinin ayına və gününə hesablanır. Fasilə ödənişsizdir və intervaldan kiçik tam dəqiqə olmalıdır. Üst-üstə düşmə xəbərdarlığı fasilənin dəqiq mövqeyi məlum olmadığı üçün bütün vaxt aralığını müqayisə edir.
+Hər ayın maaşı ayrıca saxlanır. Ayın maaşı dəyişəndə həmin ayın qeydləri rəsmi norma ilə yenidən hesablanır; digər aylar dəyişmir. Əvvəlki JSON-dakı əl ilə daxil edilmiş norma təsdiqlənmiş rəsmi norma ilə yenilənir. Aylıq maaş məlumdursa köhnə saxlanmış tarif rəsmi hesablamanı əvəz etmir. Maaş olmayan idxal qeydlərinin məlum tarifi qorunur.
 
-Qeydin tarifi saxlanarkən qeydə bağlanır. Maaş ayarının sonradan dəyişməsi əvvəlcədən tarifi olan qeydləri dəyişmir. Həmin ayın bütün qeydlərini yenidən hesablamaq üçün maaş pəncərəsində ayrıca seçim var. Digər aylar dəyişmir. Tarifi olmayan qeydlər saat analizinə daxildir; məbləğləri tarif daxil edilənədək boş göstərilir.
+Bitmə saatı başlanmadan erkəndirsə növbəti günə aiddir; qeyd başlanma tarixinin ayına hesablanır. Eyni başlanma/bitmə qəbul edilmir. Eyni əməkdaşın üst-üstə düşən qeydlərinə xəbərdarlıq göstərilir.
 
-Təsdiq / ödəniş statusu yoxdur. Excel-dəki “İcra günü statusu” işin növüdür: qeyri-iş saatı, istirahət günü, bayram günü.
+Köhnə JSON/Excel-dəki fasilə məlumatı idxalda qorunur. Yeni forma fasiləsiz qeyd yaradır; köhnə qeyd bu formada redaktə edilərsə saxlayanda müddət tam başlanma–bitmə aralığına görə hesablanır.
 
-## Saxlama və ehtiyat nüsxə
+## Funksiyalar və məlumatlar
 
-Məlumat `localStorage`-da `overtime-noter:v1` açarı ilə, hər dəyişiklikdə saxlanır. Səhifəni yeniləmək və brauzeri bağlamaq məlumatı silmir. Yazılma uğursuz olarsa, interfeysdə xəbərdarlıq görünür və məlumatı JSON kimi endirmək mümkündür. Oxunmayan əvvəlki yaddaş avtomatik əvəz edilmir; orijinalı endirmək və təsdiqlə JSON-dan bərpa etmək olar.
+- Tarix, başlanma, bitmə, əmsal, mövzu, əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, səbəb.
+- Əməkdaş və layihə məlumatlarını növbəti qeyd üçün yadda saxlamaq.
+- Redaktə, kopyalama, təsdiqlə silmə; ay, mətn, layihə və əmsal filtrləri.
+- Ümumi saat/məbləğ, aylıq trend, layihə/müştəri/səbəb/iş mühiti/həftə günü/əmsal bölgüsü, əvvəlki ayla müqayisə, gün sayı və gündəlik orta müddət.
+- JSON tam ehtiyat nüsxəsi və bərpa, XLSX idxal/ixracı. İdxaldan əvvəl icmal, təkrarların ötürülməsi və tam əvəz etməyə ayrıca təsdiq.
+- Təsdiq/ödəniş statusu yoxdur. “İcra günü statusu” qeyri-iş saatı, istirahət və ya bayram gününü bildirir.
 
-Hər brauzer profili və domen ayrıca yaddaşdır. Eyni profil və domeni paylaşan şəxslər eyni məlumatları görə bilər: bu versiya hesabla giriş və giriş nəzarəti təqdim etmir. Anonim rejim, brauzer yaddaşının silinməsi və cihazın dəyişməsi üçün müntəzəm JSON nüsxəsi saxlayın. Vercel preview və production domenləri arasında da nüsxəni əl ilə köçürmək lazımdır.
+## Saxlama
 
-**Məlumatlar → JSON endir** bütün qeydləri, aylıq maaşları və profil sahələrini saxlayır. **Fayl seç** ilə nüsxəni başqa brauzerə gətirin. İdxaldan əvvəl icmal göstərilir. Əlavə etmə rejimi mövcud ayarları qoruyur, idxal edilən məlum tarifləri saxlayır və təkrarlanan iş qeydlərini ötürür. Eyni qeydə sonradan tarif verilməsi onu yeni qeyd etmir. Tam əvəz etmə ayrıca təsdiq tələb edir.
+Qeydlər `localStorage`-da `overtime-noter:v1` açarı ilə hər dəyişiklikdə saxlanır. Yeniləmə və bağlanmadan sonra qalır. Yaddaş dolu və ya bağlıdırsa xəbərdarlıq göstərilir; saxlanmamış məlumatı JSON ilə endirmək olar. Oxunmayan əvvəlki yaddaş avtomatik əvəz edilmir.
 
-JSON və XLSX faylları brauzerdə emal edilir; tətbiq qeydləri serverə göndərmir. JSON faylında maaş və şəxsi məlumatlar açıq mətnlə olur.
+Hər domen və brauzer profili ayrıca yaddaşdır. Eyni profili paylaşan şəxslər eyni məlumatları görür. Cihazlar arasında keçid və məlumatı qorumaq üçün JSON nüsxəsi istifadə edin. Brauzer yaddaşını silmək qeydləri də silir. JSON şəxsi məlumatları və maaşı açıq mətnlə daşıyır.
 
-## Excel formatı
+## Excel hesabatı
 
-İlk 14 sütun bu ardıcıllıqdadır:
+Fayl **Aylıq yekun** vərəqi ilə açılır: ay, maaş, rəsmi norma, saatlıq tarif, overtime müddəti, qeyd sayı, məbləğ və tarifsiz qeydlər. Sonda cəmi və rəsmi mənbə linki var.
 
-| İl  | Ay  | Əməkdaş | Şöbə müdiri | Müştəri | Layihə | Tarix | Başlanma | Bitmə | İcra günü statusu | İş mühiti | Müddət (saat: dəqiqə) | Mövzu | Səbəb |
-| --- | --- | ------- | ----------- | ------- | ------ | ----- | -------- | ----- | ----------------- | --------- | --------------------- | ----- | ----- |
+**Overtime qeydləri** vərəqində ilk 14 sütun şirkət formatına uyğundur:
 
-Sonda **Əmsal**, **Saatlıq tarif (AZN)** və **Məbləğ (AZN)** əlavə edilir. “Aylıq yekun” vərəqində ay, qeyd sayı, faktiki müddət, məbləğ və tarifsiz qeydlərin sayı var. Filtr seçilibsə ixraca seçilmiş qeydlər daxildir. JSON həmişə bütün məlumatları ixrac edir.
+İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb.
 
-İdxalda `.xlsx` və `.json`, ən çox 10 MB və 50 000 qeyd dəstəklənir. Köhnə `.xls` faylını əvvəlcə Excel-də `.xlsx` kimi saxlayın. Excel-də **Tarix**, **Başlanma**, **Bitmə** başlıqları lazımdır; başlıq ilk 30 sətirdə axtarılır. Digər sahələr boş qala bilər. Mətn və real Excel tarix/saat hüceyrələri, 1900/1904 təqvimləri, zəngin mətn başlıqları dəstəklənir. Formullar icra edilmir, varsa əvvəlcədən saxlanmış nəticəsi oxunur.
+Sonda Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN) gəlir. Qruplaşdırılmış başlıqlar, mətnə uyğun sətir hündürlüyü, incə xətlər, növbələnən sətir rəngi, cəmi sətri, filtr, sabit başlıq və pul/tarix/saat formatları tətbiq olunur. Aylıq yekun A4, detallı cədvəl A3 üfüqi çap üçün qurulub; hər səhifədə başlıq təkrarlanır.
 
-Maaş məlumatı olmayan orijinal cədvəl saat analizində dərhal görünür. Maaş ayarı daxil ediləndə məbləğlər hesablanır. Yalnız məbləği olan sətirlərdən tarif bərpa olunur. Göstərilən müddət başlanma–bitmə aralığından qısadırsa fərq fasilə kimi saxlanır. Səhv sətir aşkarlanarsa bütün idxal dayandırılır və sətir nömrəsi göstərilir.
+İdxal `.xlsx` və `.json` üçün ən çox 10 MB / 50 000 qeyddir. Excel-də Tarix, Başlanma və Bitmə başlıqları ilk 30 sətirdə olmalıdır. Köhnə 14 sütunlu və yeni format idxal olunur. Səhv sətir varsa bütün idxal dayandırılır. Köhnə `.xls` faylını əvvəlcə `.xlsx` kimi saxlayın.
 
 ## Yoxlamalar
 
@@ -80,30 +81,13 @@ Maaş məlumatı olmayan orijinal cədvəl saat analizində dərhal görünür. 
 npm test
 npm run typecheck
 npm run build
-```
-
-Brauzer testləri production build istifadə edir və serveri özü başladır:
-
-```sh
-npx playwright install chromium
-npm run test:e2e
-```
-
-Sistemdə Chromium varsa:
-
-```sh
 PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:e2e
 ```
 
-Testlər maaş və əmsalları, fasilə/gecə işini, JSON/XLSX dövrəsini, orijinal Excel formatını, təkrar idxalı, brauzerdə saxlama/bərpanı, filtr və redaktəni, aylıq tariflərin qorunmasını və mobil interfeysi yoxlayır.
+Sistem Chromium-u yoxdursa `npx playwright install chromium` və `npm run test:e2e` istifadə edin. Brauzer testləri production build tələb edir, serveri özü başladır.
 
 ## Vercel
 
-1. Layihəni GitHub repozitoriyasına göndərin və Vercel-də həmin repozitoriyanı import edin.
-2. `vercel.json` framework-ü **Next.js**, build əmrini `npm run build`, install əmrini `npm ci`, Output Directory-ni `.next` kimi təyin edir. Layihəni **Other** / statik sayt kimi deploy etməyin və çıxış qovluğu olaraq `public` seçməyin.
-3. Node.js **24.x** seçin. Environment variable və database tələb olunmur.
-4. Deploy-dan sonra bir qeyd yaradın, səhifəni yeniləyin və JSON/Excel ixracını yoxlayın.
+GitHub-dan layihəni import edin. `vercel.json` **Next.js**, `npm ci`, `npm run build` və `.next` çıxış qovluğunu təyin edir. Node.js **24.x** seçin. Environment variable və database tələb olunmur. GitHub inteqrasiyası aktivdirsə `main`-ə push yeni deploy başlada bilər.
 
-`STATIC_BUILD_NO_OUT_DIR` və ya “No Output Directory named public” xətası tətbiqin build xətası deyil: Vercel statik sayt ayarlarından istifadə edir. `vercel.json` olan son commiti deploy edin. Paneldə framework-ün **Next.js** olduğuna əmin olun.
-
-GitHub inteqrasiyası aktivdirsə `main` branch-inə yeni push Vercel-də avtomatik deploy başlada bilər.
+`STATIC_BUILD_NO_OUT_DIR` / `public` xətası olarsa `vercel.json` olan son commitdən deploy edin, framework **Next.js** olsun.

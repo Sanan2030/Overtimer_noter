@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ChevronDown, Clock3, Info, Save } from "lucide-react";
+import { ArrowRight, Clock3, Info, Save } from "lucide-react";
 import {
   amount,
   AppData,
@@ -9,13 +9,14 @@ import {
   durationMinutes,
   Entry,
   formatDuration,
-  hourlyRate,
+  entryRate,
   isDate,
   money,
   overlaps,
   validateEntry,
 } from "@/lib/model";
 import { Field, Modal } from "./ui";
+import { getWorkNorm } from "@/lib/work-calendar";
 
 export function EntryForm({
   initial,
@@ -30,7 +31,7 @@ export function EntryForm({
   close: () => void;
   save: (entry: Entry, remember: boolean) => boolean;
 }) {
-  const [entry, setEntry] = useState(initial);
+  const [entry, setEntry] = useState({ ...initial, breakMinutes: 0 });
   const [remember, setRemember] = useState(true);
   const [ackOverlap, setAckOverlap] = useState(false);
   const [error, setError] = useState("");
@@ -46,7 +47,8 @@ export function EntryForm({
   } catch (err) {
     calculationError = (err as Error).message;
   }
-  const rate = entry.rate ?? hourlyRate(data.months[entry.date.slice(0, 7)]);
+  const rate = entryRate(entry, data.months);
+  const norm = getWorkNorm(entry.date.slice(0, 7));
   const total = calculationError ? null : amount(entry, data.months);
   const hasOverlap =
     isDate(entry.date) && !calculationError && overlaps(entry, data.entries);
@@ -139,16 +141,15 @@ export function EntryForm({
                 ))}
               </div>
             </Field>
-            <Field label="Fasilə (dəqiqə)">
-              <input
-                type="number"
-                min="0"
-                max="1438"
-                step="1"
-                value={entry.breakMinutes}
-                onChange={(e) => update("breakMinutes", Number(e.target.value))}
-              />
-            </Field>
+            <div className="norm-note">
+              <span>Aylıq norma</span>
+              <strong>{norm ? `${norm.hours} saat` : "Məlumat yoxdur"}</strong>
+              {norm && (
+                <a href={norm.sourceUrl} target="_blank" rel="noreferrer">
+                  ƏƏSMN · {norm.year} təqvimi ↗
+                </a>
+              )}
+            </div>
           </div>
           <div className="calculation">
             <div>
@@ -181,8 +182,8 @@ export function EntryForm({
             <p className="inline-info">
               <Info size={16} /> Məbləği hesablamaq üçün{" "}
               {displayDate(`${entry.date.slice(0, 7)}-01`).slice(3)} ayının
-              maaşını və norma saatını daxil et. Qeydi tarifsiz də saxlamaq
-              olar.
+              maaşını daxil et. Norma saatı avtomatik seçilir. Qeydi tarifsiz də
+              saxlamaq olar.
             </p>
           )}
           <Field label="Mövzu">
@@ -194,10 +195,7 @@ export function EntryForm({
               onChange={(e) => update("subject", e.target.value)}
             />
           </Field>
-          <details className="details-form">
-            <summary>
-              Ətraflı məlumatlar <ChevronDown size={17} />
-            </summary>
+          <section className="entry-metadata" aria-label="Qeyd məlumatları">
             <div className="form-grid two">
               <Field label="Əməkdaş">
                 <input
@@ -294,7 +292,7 @@ export function EntryForm({
               Əməkdaş, rəhbər, müştəri, layihə və iş mühitini növbəti qeyd üçün
               yadda saxla
             </label>
-          </details>
+          </section>
           {hasOverlap && (
             <div className="warning">
               <strong>Vaxt aralığı üst-üstə düşür</strong>

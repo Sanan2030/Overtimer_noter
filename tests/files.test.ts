@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import {
   createWorkbook,
   EXCEL_HEADERS,
+  REPORT_HEADER_ROW,
   jsonBackup,
   parseBackup,
   parseWorkbook,
@@ -31,7 +32,7 @@ async function source(
 test("JSON round trip preserves all data, including monthly salary and profile", () => {
   const data = {
     ...emptyData(),
-    months: { "2026-10": { salary: 1200, hours: 160 } },
+    months: { "2026-10": { salary: 1320, hours: 176 } },
     entries: [newEntry(emptyProfile, "2026-10-02")],
   };
   assert.deepEqual(parseBackup(jsonBackup(data)), data);
@@ -65,7 +66,7 @@ test("imports the original 14-column company format without a rate", async () =>
   assert.equal(durationMinutes(row), 180);
   assert.equal(row.multiplier, 1);
   assert.equal(amount(row, {}), null);
-  assert.equal(amount(row, { "2026-10": { salary: 1200, hours: 160 } }), 22.5);
+  assert.equal(amount(row, { "2026-10": { salary: 1320, hours: 176 } }), 22.5);
 });
 test("XLSX round trip preserves overnight, breaks, numeric times, amount and exact headers", async () => {
   const row = {
@@ -81,7 +82,7 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
   };
   const data = {
     ...emptyData(),
-    months: { "2026-10": { salary: 1200, hours: 160 } },
+    months: { "2026-10": { salary: 1320, hours: 176 } },
     entries: [row],
   };
   const buffer = await createWorkbook(data);
@@ -94,13 +95,16 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
   assert.equal(mergeData(data, imported).added, 0);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer.buffer as ArrayBuffer);
-  const sheet = workbook.worksheets[0];
+  const sheet = workbook.getWorksheet("Overtime qeydləri")!;
   assert.deepEqual(
-    (sheet.getRow(1).values as string[]).slice(1),
+    (sheet.getRow(REPORT_HEADER_ROW).values as string[]).slice(1),
     EXCEL_HEADERS,
   );
-  assert.equal(sheet.getCell("M2").type, ExcelJS.ValueType.String);
-  assert.equal(workbook.worksheets[1].getCell("D2").value, 78.75);
+  assert.equal(sheet.getCell("M7").type, ExcelJS.ValueType.String);
+  assert.equal(
+    workbook.getWorksheet("Aylıq yekun")!.getCell("G7").value,
+    78.75,
+  );
 });
 test("invalid Excel rows reject the whole file with row diagnostics", async () => {
   const buffer = await source([
