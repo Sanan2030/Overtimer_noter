@@ -15,11 +15,18 @@ import {
   Entry,
   formatDuration,
   money,
-  MONTHS,
 } from "@/lib/model";
 import { EmptyState } from "./ui";
 
-export function Stats({ entries, data }: { entries: Entry[]; data: AppData }) {
+export function Stats({
+  entries,
+  data,
+  compact = false,
+}: {
+  entries: Entry[];
+  data: AppData;
+  compact?: boolean;
+}) {
   const minutes = entries.reduce((sum, e) => sum + durationMinutes(e), 0);
   const total = entries.reduce(
     (sum, e) => sum + (amount(e, data.months) ?? 0),
@@ -30,7 +37,7 @@ export function Stats({ entries, data }: { entries: Entry[]; data: AppData }) {
   ).length;
   const days = new Set(entries.map((e) => e.date)).size;
   return (
-    <div className="stats-grid">
+    <div className={`stats-grid ${compact ? "compact" : ""}`}>
       <div className="stat-card">
         <div className="stat-label">
           Overtime müddəti{" "}
@@ -59,31 +66,35 @@ export function Stats({ entries, data }: { entries: Entry[]; data: AppData }) {
             : "Əmsallar nəzərə alınmaqla"}
         </p>
       </div>
-      <div className="stat-card">
-        <div className="stat-label">
-          Overtime günləri{" "}
-          <span className="stat-icon blue">
-            <Layers3 size={19} />
-          </span>
-        </div>
-        <div className="stat-value">
-          {days} <small>gün</small>
-        </div>
-        <p>{entries.length} qeyd əlavə edilib</p>
-      </div>
-      <div className="stat-card">
-        <div className="stat-label">
-          Gündəlik orta müddət{" "}
-          <span className="stat-icon purple">
-            <TrendingUp size={19} />
-          </span>
-        </div>
-        <div className="stat-value">
-          {formatDuration(days ? Math.round(minutes / days) : 0)}{" "}
-          <small>saat</small>
-        </div>
-        <p>Overtime olan günlər üzrə</p>
-      </div>
+      {!compact && (
+        <>
+          <div className="stat-card">
+            <div className="stat-label">
+              Overtime günləri{" "}
+              <span className="stat-icon blue">
+                <Layers3 size={19} />
+              </span>
+            </div>
+            <div className="stat-value">
+              {days} <small>gün</small>
+            </div>
+            <p>{entries.length} qeyd əlavə edilib</p>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">
+              Gündəlik orta müddət{" "}
+              <span className="stat-icon purple">
+                <TrendingUp size={19} />
+              </span>
+            </div>
+            <div className="stat-value">
+              {formatDuration(days ? Math.round(minutes / days) : 0)}{" "}
+              <small>saat</small>
+            </div>
+            <p>Overtime olan günlər üzrə</p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -96,7 +107,20 @@ export function Trend({ data, month }: { data: AppData; month: string }) {
     const entries = data.entries.filter((e) => e.date.startsWith(key));
     return {
       key,
-      label: MONTHS[date.getMonth()].slice(0, 3),
+      label: [
+        "Yan",
+        "Fev",
+        "Mar",
+        "Apr",
+        "May",
+        "İyn",
+        "İyl",
+        "Avq",
+        "Sen",
+        "Okt",
+        "Noy",
+        "Dek",
+      ][date.getMonth()],
       minutes: entries.reduce((sum, e) => sum + durationMinutes(e), 0),
       total: entries.reduce((sum, e) => sum + (amount(e, data.months) ?? 0), 0),
     };
@@ -164,6 +188,29 @@ export function Trend({ data, month }: { data: AppData; month: string }) {
         </p>
       )}
     </section>
+  );
+}
+
+export function ActivitySummary({ entries }: { entries: Entry[] }) {
+  const days = new Set(entries.map((entry) => entry.date)).size;
+  const minutes = entries.reduce(
+    (sum, entry) => sum + durationMinutes(entry),
+    0,
+  );
+  return (
+    <div className="activity-summary">
+      <span>
+        <strong>{entries.length}</strong> qeyd
+      </span>
+      <span>
+        <strong>{days}</strong> overtime günü
+      </span>
+      <span>
+        Gündəlik orta:{" "}
+        <strong>{formatDuration(days ? Math.round(minutes / days) : 0)}</strong>{" "}
+        saat
+      </span>
+    </div>
   );
 }
 

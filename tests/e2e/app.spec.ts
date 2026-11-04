@@ -47,7 +47,7 @@ test("calculates overtime, persists after reload and exports a complete JSON bac
   await page.getByLabel("Hesabat dövrü").selectOption("2026-10");
   await expect(row).toBeVisible();
   await expect(row).toContainText("02:00");
-  await page.getByRole("button", { name: "Məlumatlar", exact: true }).click();
+  await page.getByRole("button", { name: "Fayllar", exact: true }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "JSON endir", exact: true }).click();
   const download = await downloadPromise;
@@ -98,28 +98,24 @@ test("imports original Excel, prices old records, exports matching columns and s
     (await workbook.xlsx.writeBuffer()) as ArrayBuffer,
   );
   await page.goto("/");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "oktyabr.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer,
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "oktyabr.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
   await expect(page.getByRole("dialog")).toContainText("1 yeni qeyd");
   await page.getByRole("button", { name: "Qeydləri idxal et" }).click();
   const row = page.getByRole("row").filter({ hasText: "NMR AzDoc" });
   await expect(row).toContainText("Tarif yoxdur");
   await setSalary(page);
   await expect(row).toContainText("22,50");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "oktyabr.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer,
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "oktyabr.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
   await expect(page.getByRole("dialog")).toContainText("0 yeni qeyd");
   await page.getByRole("button", { name: "Qeydləri idxal et" }).click();
   await expect(page.getByRole("row")).toHaveCount(2);
@@ -140,7 +136,7 @@ test("JSON restore survives navigation and repeated imports, each browser starts
   await page.goto("/");
   await setSalary(page);
   await addEntry(page, "Ehtiyat nüsxə qeydi", 2);
-  await page.getByRole("button", { name: "Məlumatlar", exact: true }).click();
+  await page.getByRole("button", { name: "Fayllar", exact: true }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "JSON endir", exact: true }).click();
   const download = await downloadPromise;
@@ -149,26 +145,22 @@ test("JSON restore survives navigation and repeated imports, each browser starts
   const otherPage = await other.newPage();
   await otherPage.goto("http://127.0.0.1:3000");
   await expect(
-    otherPage.getByText("İlk saatını qeyd et", { exact: true }),
+    otherPage.getByText("Hələ qeyd yoxdur", { exact: true }),
   ).toBeVisible();
-  await otherPage
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: backup,
-    });
+  await otherPage.locator('input[type="file"]').setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: backup,
+  });
   await otherPage.getByRole("button", { name: "Qeydləri idxal et" }).click();
   await expect(
     otherPage.getByRole("row").filter({ hasText: "Ehtiyat nüsxə qeydi" }),
   ).toContainText("30,00");
-  await otherPage
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: backup,
-    });
+  await otherPage.locator('input[type="file"]').setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: backup,
+  });
   await expect(otherPage.getByRole("dialog")).toContainText("0 yeni qeyd");
   await otherPage.getByRole("button", { name: "Qeydləri idxal et" }).click();
   await expect(otherPage.getByRole("row")).toHaveCount(2);
@@ -252,12 +244,21 @@ test("mobile layout has no page overflow and supports a new overnight record", a
   await dialog
     .getByRole("button", { name: "Qeydi saxla", exact: true })
     .click();
+  await expect(
+    page.getByRole("row").filter({ hasText: "Gecə işi" }),
+  ).toContainText("52,50");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await page.getByRole("button", { name: "Analiz", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.getByText("Daha ətraflı analiz", { exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Həftənin günləri" }),
   ).toBeVisible();
@@ -269,39 +270,35 @@ test("malformed imports never overwrite existing records and replacement require
   await page.goto("/");
   await setSalary(page);
   await addEntry(page, "Qorunan qeyd");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "broken.json",
-      mimeType: "application/json",
-      buffer: Buffer.from("{broken"),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "broken.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{broken"),
+  });
   await expect(
     page.getByRole("alert").filter({ hasText: "JSON faylı oxunmur" }),
   ).toBeVisible();
   await expect(
     page.getByRole("row").filter({ hasText: "Qorunan qeyd" }),
   ).toBeVisible();
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "empty.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(
-        JSON.stringify({
-          version: 1,
-          profile: {
-            employee: "",
-            manager: "",
-            customer: "",
-            project: "",
-            environment: "ofis şəraiti",
-          },
-          months: {},
-          entries: [],
-        }),
-      ),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "empty.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 1,
+        profile: {
+          employee: "",
+          manager: "",
+          customer: "",
+          project: "",
+          environment: "ofis şəraiti",
+        },
+        months: {},
+        entries: [],
+      }),
+    ),
+  });
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("radio", { name: /Bütün məlumatları fayldakı ilə əvəz et/ })
@@ -330,7 +327,7 @@ test("blocked browser storage warns clearly and JSON can still rescue in-memory 
     "Dəyişiklik brauzerdə saxlanmadı",
   );
   await expect(page.locator(".save-status")).toContainText("Saxlanmayıb");
-  await page.getByRole("button", { name: "Məlumatlar", exact: true }).click();
+  await page.getByRole("button", { name: "Fayllar", exact: true }).click();
   const downloadPromise = page.waitForEvent("download");
   await page
     .locator(".data-card")
@@ -377,13 +374,11 @@ test("corrupt stored data is preserved until an explicitly confirmed restore", a
     months: {},
     entries: [],
   };
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "restore.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(backup)),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "restore.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(backup)),
+  });
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: "Əvəz et və bərpa et" }).click();

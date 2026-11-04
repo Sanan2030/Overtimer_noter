@@ -1,0 +1,95 @@
+# ArtıSaat — dizayn tapşırığı
+
+ArtıSaat əməkdaşın əlavə iş saatlarını qeyd etməsi və qarşılığındakı məbləği görməsi üçün sadə Azərbaycan dilli tətbiqdir. Əsas istifadəçi texniki bilik olmadan bir neçə saniyəyə qeyd əlavə edə bilməlidir.
+
+## Tətbiqin etdiyi işlər
+
+1. Hər ayın net maaşını və norma iş saatını saxlayır, saatlıq tarifi hesablayır.
+2. Tarix, başlanma və bitmə saatından əlavə iş müddətini çıxarır. Fasiləni nəzərə alır, gecəni keçən qeydləri qəbul edir.
+3. Standart 1x, seçilə bilən 2x və 3x əmsalla hər qeydin məbləğini hesablayır.
+4. Qeydləri brauzerdə avtomatik saxlayır; redaktə, kopyalama, silmə, ay/mətn/layihə/əmsal filtrləri var.
+5. Saat və məbləğlərin aylıq yekununu, aylıq trendi, layihə/müştəri/səbəb/iş mühiti/həftə günləri/əmsal bölgüsünü və əvvəlki ayla müqayisəni göstərir.
+6. JSON ilə bütün məlumatların ehtiyat nüsxəsini çıxarır və bərpa edir; əvvəlki Excel fayllarını idxal edib analizə daxil edir, şirkət formatında Excel ixrac edir.
+
+Bu versiyada giriş, ortaq hesab, rəhbər paneli, təsdiq və ödəniş statusu yoxdur. Hər kəs öz brauzerində işləyir. Eyni brauzer profilində məlumatlar ortaq görünür; başqa cihazla avtomatik sinxronizasiya yoxdur. Saxlanmış məlumat sxemi və `overtime-noter:v1` yaddaş açarı dəyişdirilməməlidir.
+
+## Məlumat xanaları
+
+| Bölmə         | İstifadəçinin daxil etdiyi                                                                 | Avtomatik hesablanan           |
+| ------------- | ------------------------------------------------------------------------------------------ | ------------------------------ |
+| Aylıq maaş    | Ay/il, net maaş (AZN), ayın norma iş saatı                                                 | Saatlıq tarif                  |
+| Əsas qeyd     | Tarix, başlanma saatı, bitmə saatı, əmsal (1x/2x/3x), istəyə görə fasilə dəqiqəsi və mövzu | İl, ay, faktiki müddət, məbləğ |
+| Əlavə məlumat | Əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, səbəb                 | —                              |
+
+“İcra günü statusu” işin qeyri-iş saatı, istirahət günü və ya bayram günü olmasını bildirir. Təsdiq və ödəniş statusu deyil. Əlavə məlumatlar açılıb-bağlanan bölmədə olmalıdır. Əməkdaş, rəhbər, müştəri, layihə və iş mühiti növbəti qeyd üçün yadda saxlanıla bilər.
+
+## Hesablama
+
+```text
+Saatlıq tarif = net maaş / ayın norma iş saatı
+Məbləğ = (iş dəqiqəsi − fasilə dəqiqəsi) / 60 × saatlıq tarif × əmsal
+```
+
+Məsələn, 1 200 AZN / 160 saat = 7,50 AZN/saat. 18:00–20:00 aralığı 1x üçün 15,00 AZN, 2x üçün 30,00 AZN, 3x üçün 45,00 AZN edir. Faktiki saat əmsaldan asılı olaraq artmır. Hər ayın maaşı ayrıdır; əvvəlki tariflər ayrıca təsdiq olmadan dəyişdirilmir.
+
+## Sadə ekran quruluşu
+
+- Üstdə kiçik ArtıSaat adı və avtomatik saxlama göstəricisi.
+- Üç tab: **Qeydlərim**, **Analiz**, **Fayllar**. Yan menyu yoxdur.
+- Qeydlərim: ay seçimi, Aylıq maaş düyməsi, cəmi saat və cəmi məbləğ, Yeni qeyd düyməsi və qeydlər. Əsas ekranda qrafik yoxdur.
+- Yeni qeyd: tarix, iki saat, əmsal, fasilə və mövzu; müddət və məbləğ dərhal görünür. Digər xanalar “Ətraflı məlumatlar” altında açılır.
+- Qeydlər masaüstündə sadə cədvəl, telefonda asan oxunan kartlardır.
+- Analiz: iki yekun göstərici, aylıq trend və layihə bölgüsü. Digər qrafiklər “Daha ətraflı analiz” altında açılır.
+- Fayllar: JSON endir, Excel endir, Fayl seç. İdxalın əvvəlcədən icmalı və təsdiqi saxlanılır.
+
+Excel-də ilk 14 sütun bu ardıcıllıqdadır: İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb. Sonra Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN) gəlir. Aylıq yekun ayrıca vərəqdədir.
+
+## Başqa AI-yə veriləcək prompt
+
+```text
+Design a minimal, easy-to-understand responsive web app called “ArtıSaat”.
+It helps employees record overtime and calculate its value in AZN.
+All interface text must be in Azerbaijani.
+
+The main goal is to add an overtime record in a few seconds. Use a calm white
+background, thin gray borders, one muted green accent, readable 14–16 px body
+text, clear labels, and generous spacing. Avoid decorative dashboards,
+gradients, large slogans, sidebars, and repeated action buttons.
+
+Use three simple top tabs: “Qeydlərim”, “Analiz”, and “Fayllar”.
+
+1. Qeydlərim (the default screen): month selector, “Aylıq maaş” settings,
+   only two summary values (total actual hours and total amount), one prominent
+   “Yeni qeyd” button, and a clean records list. No charts on this screen.
+   Desktop columns: date/time, subject/project, duration, multiplier, amount,
+   and edit/copy/delete actions. Use readable cards on phones. Keep search
+   visible and project/multiplier filters behind a small expandable control.
+2. New-record form: date, start time, end time, multiplier segmented control
+   (1x default, 2x, 3x), optional unpaid break in minutes, and optional subject.
+   Display calculated duration and amount immediately. Hide employee, manager,
+   customer, project, day type, work environment, and reason under
+   “Ətraflı məlumatlar”. Provide clear “Qeydi saxla” and “Ləğv et” buttons.
+3. Monthly salary settings: month/year, monthly net salary in AZN, normal
+   monthly work hours, and a read-only hourly rate.
+   Amount = worked hours after breaks × (net salary / monthly normal hours)
+   × multiplier. Two actual hours at 3x remain two hours in time summaries.
+4. Analiz: monthly hours/amount, a monthly trend, and project breakdown.
+   Put customer, reason, environment, weekday, multiplier, and previous-month
+   comparison behind “Daha ətraflı analiz”.
+5. Fayllar: download a complete JSON backup, restore/merge JSON, export XLSX,
+   and import an existing XLSX. Show an import preview before confirmation.
+
+Include empty, populated, validation-error, missing-salary, and import-preview
+states. Support overnight shifts and unpaid breaks. Show a small auto-save
+indicator. No login, subscription, team management, approval, or payment
+status: each person's data stays in their own browser. Device-to-device
+transfer uses JSON. Do not add features outside this scope.
+
+For an existing-code redesign: preserve all calculation, import/export,
+validation, and localStorage behavior, including the existing storage key and
+backup schema. Change presentation only. Use Next.js, React, and TypeScript.
+
+Deliver desktop and mobile screens with a consistent, restrained design.
+```
+
+Vizual ekranlar üçün Google Stitch, işlək Next.js/React interfeysi üçün v0, dizaynı Figma daxilində davam etdirmək üçün Figma Make istifadə edilə bilər. Mövcud funksiyaları saxlayan işlək kod istənilirsə bu promptu v0-da mövcud layihə ilə birlikdə istifadə etmək uyğundur.

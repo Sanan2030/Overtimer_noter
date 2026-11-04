@@ -1,6 +1,10 @@
-# Overtime
+# ArtıSaat
 
 Azərbaycan dilində əlavə iş saatları və məbləğlərin uçotu. Next.js / React / TypeScript ilə hazırlanıb; Vercel-də işləyir. Backend, hesabla giriş, xarici verilənlər bazası və API açarı tələb etmir.
+
+İnterfeys üç bölmədən ibarətdir: **Qeydlərim**, **Analiz**, **Fayllar**. Əsas ekran yalnız saat/məbləğ yekununu və qeydləri göstərir; əlavə xanalar, filtrlər və detallı analiz lazım olduqda açılır. Telefonda qeydlər kart formasındadır.
+
+Funksiyalar, bütün məlumat xanaları və başqa AI ilə dizayn hazırlamaq üçün hazır prompt: [Dizayn tapşırığı](DESIGN_BRIEF.md).
 
 ## Başlatmaq
 

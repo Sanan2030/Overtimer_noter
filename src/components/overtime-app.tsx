@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownToLine,
-  ArrowRight,
   BarChart3,
   CalendarDays,
   Check,
@@ -18,13 +16,10 @@ import {
   FileJson,
   FileSpreadsheet,
   FolderOpen,
-  LayoutDashboard,
-  ListFilter,
   LoaderCircle,
   Pencil,
   Plus,
   Search,
-  Settings2,
   ShieldCheck,
   Trash2,
   Upload,
@@ -57,27 +52,31 @@ import {
 } from "@/lib/files";
 import { STORAGE_KEY } from "@/lib/model";
 import { EntryForm } from "./entry-form";
-import { Breakdown, Multipliers, Stats, Trend, Weekdays } from "./analytics";
+import {
+  ActivitySummary,
+  Breakdown,
+  Multipliers,
+  Stats,
+  Trend,
+  Weekdays,
+} from "./analytics";
 import { EmptyState, Field, Modal } from "./ui";
 
-type Page = "overview" | "records" | "analytics" | "data";
+type Page = "records" | "analytics" | "data";
 const NAV = [
-  { id: "overview", label: "İcmal", icon: LayoutDashboard },
   { id: "records", label: "Qeydlərim", icon: Clock3 },
   { id: "analytics", label: "Analiz", icon: BarChart3 },
-  { id: "data", label: "Məlumatlar", icon: Database },
+  { id: "data", label: "Fayllar", icon: Database },
 ] as const;
 const TITLES = {
-  overview: "Vaxtına dəyər qat.",
-  records: "Hər saat öz yerində.",
-  analytics: "Rəqəmlərin arxasındakı hekayə.",
-  data: "Məlumatların səninlə qalsın.",
+  records: "Əlavə iş saatları",
+  analytics: "Vaxt və gəlir analizi",
+  data: "İdxal və ixrac",
 };
 const SUBTITLES = {
-  overview: "Əlavə iş saatların və qazancın, bir yerdə.",
-  records: "Overtime qeydlərini gör, axtar və idarə et.",
-  analytics: "Vaxtını hara sərf etdiyini daha yaxşı anla.",
-  data: "Ehtiyat nüsxə yarat, Excel-dən idxal et və hesabatını paylaş.",
+  records: "İş saatlarını qeyd et, məbləği avtomatik hesabla.",
+  analytics: "Seçdiyin dövrün saat və məbləğlərinə bax.",
+  data: "Excel hesabatı endir və ya əvvəlki qeydlərini yüklə.",
 };
 
 export default function OvertimeApp() {
@@ -88,7 +87,7 @@ export default function OvertimeApp() {
   const [corruptRaw, setCorruptRaw] = useState<string | null>(null);
   const [unsaved, setUnsaved] = useState(false);
   const unsavedRef = useRef(false);
-  const [page, setPage] = useState<Page>("overview");
+  const [page, setPage] = useState<Page>("records");
   const [period, setPeriod] = useState("");
   const [search, setSearch] = useState("");
   const [project, setProject] = useState("");
@@ -135,7 +134,7 @@ export default function OvertimeApp() {
       if (raw) {
         setCorruptRaw(raw);
         setStorageError(
-          "Saxlanmış məlumat oxunmur. Orijinal nüsxə qorunur. Məlumatlar bölməsindən onu endir və ya düzgün JSON nüsxəsi ilə əvəz et.",
+          "Saxlanmış məlumat oxunmur. Orijinal nüsxə qorunur. Fayllar bölməsindən onu endir və ya düzgün JSON nüsxəsi ilə əvəz et.",
         );
       } else
         setStorageError(
@@ -287,10 +286,10 @@ export default function OvertimeApp() {
   }, [period, search, project, multiplierFilter]);
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / 15));
   const actualPage = Math.min(pageNumber, totalPages);
-  const visibleEntries =
-    page === "overview"
-      ? selectedEntries.slice(0, 5)
-      : filteredEntries.slice((actualPage - 1) * 15, actualPage * 15);
+  const visibleEntries = filteredEntries.slice(
+    (actualPage - 1) * 15,
+    actualPage * 15,
+  );
   const openNew = () => {
     const today = localDate();
     const date =
@@ -325,7 +324,7 @@ export default function OvertimeApp() {
   const exportJson = () => {
     downloadFile(
       jsonBackup(data),
-      `overtime-ehtiyat-${localDate()}.json`,
+      `artisaat-ehtiyat-${localDate()}.json`,
       "application/json;charset=utf-8",
     );
     notify(
@@ -341,7 +340,7 @@ export default function OvertimeApp() {
       const workbook = await createWorkbook(data, entries);
       downloadFile(
         workbook as BlobPart,
-        `overtime-${period}.xlsx`,
+        `artisaat-${period}.xlsx`,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       notify(`${entries.length} qeyd və aylıq yekun Excel faylına yazıldı.`);
@@ -404,140 +403,86 @@ export default function OvertimeApp() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a
-          href="#"
-          className="brand"
-          onClick={(e) => {
-            e.preventDefault();
-            setPage("overview");
-          }}
-        >
-          <div className="brand-mark">
-            <Clock3 size={25} strokeWidth={2.2} />
+      <header className="app-header">
+        <div className="header-inner">
+          <a
+            href="#"
+            className="brand"
+            onClick={(event) => {
+              event.preventDefault();
+              setPage("records");
+            }}
+          >
+            <span className="brand-mark">
+              <Clock3 size={22} />
+            </span>
+            <span>ArtıSaat</span>
+          </a>
+          <div className="header-actions">
+            <div className={`save-status ${storageError ? "save-error" : ""}`}>
+              {storageError ? (
+                <CircleHelp size={15} />
+              ) : (
+                <CheckCircle2 size={15} />
+              )}
+              <span>
+                {storageError
+                  ? unsaved
+                    ? "Saxlanmayıb"
+                    : "Yaddaşı yoxla"
+                  : "Bu brauzerdə saxlanılır"}
+              </span>
+            </div>
+            <button
+              className="icon-button"
+              aria-label="Necə işləyir?"
+              onClick={() => setHelp(true)}
+            >
+              <CircleHelp size={19} />
+            </button>
           </div>
-          <span>
-            overtime<span className="brand-period">.</span>
-            <small>VAXTININ DƏYƏRİ</small>
-          </span>
-        </a>
-        <div className="nav-caption">İŞ MƏKANIN</div>
-        <nav aria-label="Əsas menyu">
+        </div>
+      </header>
+      <main className="main-content">
+        {storageError && (
+          <div className="storage-warning" role="alert">
+            <CircleHelp size={20} />
+            <p>{storageError}</p>
+            <button
+              className="button secondary small"
+              onClick={() => {
+                if (corruptRaw)
+                  downloadFile(
+                    corruptRaw,
+                    "artisaat-orijinal.json",
+                    "application/json",
+                  );
+                else exportJson();
+              }}
+            >
+              JSON endir
+            </button>
+          </div>
+        )}
+        <nav className="page-tabs" aria-label="Əsas menyu">
           {NAV.map((item) => (
             <button
               key={item.id}
               aria-label={item.label}
-              className={`nav-item ${page === item.id ? "active" : ""}`}
               aria-current={page === item.id ? "page" : undefined}
+              className={page === item.id ? "active" : ""}
               onClick={() => setPage(item.id)}
             >
-              <item.icon size={19} />
-              <span>{item.label}</span>
-              {item.id === "records" && data.entries.length > 0 && (
-                <small>{data.entries.length}</small>
-              )}
+              {item.label}
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="local-card">
-            <div>
-              <ShieldCheck size={18} />
-              <strong>Şəxsi iş məkanın</strong>
-            </div>
-            <p>
-              Qeydlərin yalnız bu brauzerdə saxlanır. Ehtiyat nüsxəni unutma.
-            </p>
-            <button onClick={exportJson}>
-              JSON nüsxəsi endir <ArrowDownToLine size={15} />
-            </button>
+        <div className="page-heading">
+          <div>
+            <h1>{TITLES[page]}</h1>
+            <p>{SUBTITLES[page]}</p>
           </div>
-          <button className="help-button" onClick={() => setHelp(true)}>
-            <CircleHelp size={18} />
-            Necə işləyir?
-          </button>
-          <div className="user-card">
-            <span className="avatar">
-              {data.profile.employee
-                ? data.profile.employee
-                    .trim()
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((s) => s[0])
-                    .join("")
-                    .toLocaleUpperCase("az")
-                : "S"}
-            </span>
-            <div>
-              <strong>{data.profile.employee || "Şəxsi iş məkanı"}</strong>
-              <small>Lokal iş məkanı · AZN</small>
-            </div>
-            <button
-              className="icon-button"
-              aria-label="Aylıq maaş ayarları"
-              onClick={() => setSalaryMonth(month)}
-            >
-              <Settings2 size={18} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumb">
-            İş məkanım <ChevronRight size={14} />
-            <strong>{NAV.find((item) => item.id === page)?.label}</strong>
-          </div>
-          <div className={`save-status ${storageError ? "save-error" : ""}`}>
-            {storageError ? (
-              <CircleHelp size={15} />
-            ) : (
-              <CheckCircle2 size={15} />
-            )}
-            <span>
-              {storageError
-                ? unsaved
-                  ? "Saxlanmayıb"
-                  : "Yaddaşı yoxla"
-                : "Bu brauzerdə saxlanılır"}
-            </span>
-          </div>
-        </header>
-        <main className="main-content">
-          {storageError && (
-            <div className="storage-warning" role="alert">
-              <CircleHelp size={20} />
-              <p>{storageError}</p>
-              <button
-                className="button secondary small"
-                onClick={() => {
-                  if (corruptRaw)
-                    downloadFile(
-                      corruptRaw,
-                      "overtime-orijinal.json",
-                      "application/json",
-                    );
-                  else exportJson();
-                }}
-              >
-                JSON endir
-              </button>
-            </div>
-          )}
-          <div className="page-heading">
-            <div>
-              <div className="eyebrow">
-                {page === "overview"
-                  ? "SƏNİN İŞ GÜNDƏLİYİN"
-                  : page === "analytics"
-                    ? "VAXT VƏ GƏLİR"
-                    : page === "records"
-                      ? "OVERTIME QEYDLƏRİ"
-                      : "İDXAL VƏ İXRAC"}
-              </div>
-              <h1>{TITLES[page]}</h1>
-              <p>{SUBTITLES[page]}</p>
-            </div>
+          {page === "records" && (
             <button
               className="button primary"
               onClick={openNew}
@@ -546,178 +491,121 @@ export default function OvertimeApp() {
               <Plus size={18} />
               Yeni qeyd
             </button>
-          </div>
-          {page !== "data" && (
-            <div className="period-toolbar">
-              <div className="period-selector">
-                <CalendarDays size={17} />
-                <select
-                  aria-label="Hesabat dövrü"
-                  value={period}
-                  onChange={(e) => {
-                    setPeriod(e.target.value);
-                    setProject("");
-                  }}
-                >
-                  <option value="all">Bütün tarixlər</option>
-                  {months.map((key) => (
-                    <option key={key} value={key}>
-                      {monthLabel(key)}
-                    </option>
-                  ))}
-                </select>
-                <div className="month-arrows">
-                  <button
-                    aria-label="Əvvəlki ay"
-                    onClick={() => changeMonth(-1)}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    aria-label="Növbəti ay"
-                    onClick={() => changeMonth(1)}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className="toolbar-actions">
-                <button
-                  className="button text-button"
-                  onClick={() => setSalaryMonth(month)}
-                >
-                  <Wallet size={17} />
-                  <span>Aylıq maaş</span>
+          )}
+        </div>
+        {page !== "data" && (
+          <div className="period-toolbar">
+            <div className="period-selector">
+              <CalendarDays size={17} />
+              <select
+                aria-label="Hesabat dövrü"
+                value={period}
+                onChange={(event) => {
+                  setPeriod(event.target.value);
+                  setProject("");
+                }}
+              >
+                <option value="all">Bütün tarixlər</option>
+                {months.map((key) => (
+                  <option key={key} value={key}>
+                    {monthLabel(key)}
+                  </option>
+                ))}
+              </select>
+              <div className="month-arrows">
+                <button aria-label="Əvvəlki ay" onClick={() => changeMonth(-1)}>
+                  <ChevronLeft size={17} />
                 </button>
-                <button
-                  className="button secondary small"
-                  onClick={exportExcel}
-                  disabled={busy || selectedEntries.length === 0}
-                >
-                  {busy ? (
-                    <LoaderCircle size={16} className="spin" />
-                  ) : (
-                    <Download size={16} />
-                  )}
-                  Excel ixrac et
+                <button aria-label="Növbəti ay" onClick={() => changeMonth(1)}>
+                  <ChevronRight size={17} />
                 </button>
               </div>
             </div>
-          )}
-          {page === "overview" && (
-            <>
-              {!data.months[month] && (
-                <div className="salary-banner">
-                  <span className="banner-icon">
-                    <Wallet size={21} />
-                  </span>
-                  <div>
-                    <strong>Vaxtının saatlıq dəyərini təyin et</strong>
-                    <p>
-                      {monthLabel(month)} üçün net maaş və norma saatını daxil
-                      et, məbləğlər avtomatik hesablansın.
-                    </p>
-                  </div>
-                  <button onClick={() => setSalaryMonth(month)}>
-                    Maaş əlavə et <ArrowRight size={16} />
-                  </button>
-                </div>
+            <div className="salary-control">
+              {period !== "all" && data.months[month] && (
+                <span>
+                  {money(data.months[month].salary / data.months[month].hours)}{" "}
+                  ₼ / saat
+                </span>
               )}
-              <Stats entries={selectedEntries} data={data} />
-              <div className="overview-charts">
-                <Trend data={data} month={period} />
-                <Multipliers entries={selectedEntries} data={data} />
-              </div>
-            </>
-          )}
-          {(page === "overview" || page === "records") && (
-            <section className="panel records-panel">
-              <div className="panel-heading">
-                <div>
-                  <h2>
-                    {page === "overview" ? "Son qeydlər" : "Overtime qeydləri"}
-                    <span className="count-badge">
-                      {page === "overview"
-                        ? selectedEntries.length
-                        : filteredEntries.length}
-                    </span>
-                  </h2>
-                  <p>
-                    {page === "overview"
-                      ? "Əlavə iş saatlarının qısa icmalı"
-                      : "Seçilmiş dövrə aid bütün qeydlər"}
-                  </p>
-                </div>
-                {page === "overview" ? (
-                  <button
-                    className="text-link"
-                    onClick={() => setPage("records")}
-                  >
-                    Hamısına bax <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    className="button secondary small"
-                    onClick={() => fileInput.current?.click()}
-                    disabled={busy}
-                  >
-                    <Upload size={15} />
-                    İdxal et
-                  </button>
-                )}
-              </div>
-              {page === "records" && (
-                <>
-                  <div className="record-summary">
-                    <span>
-                      <Clock3 size={15} />
-                      {formatDuration(
-                        filteredEntries.reduce(
-                          (s, e) => s + durationMinutes(e),
-                          0,
-                        ),
-                      )}{" "}
-                      saat
-                    </span>
-                    <span>
-                      <Wallet size={15} />
-                      {money(
-                        filteredEntries.reduce(
-                          (s, e) => s + (amount(e, data.months) ?? 0),
-                          0,
-                        ),
-                      )}{" "}
-                      AZN
-                    </span>
-                  </div>
-                  <div className="filters">
+              <button
+                className="button secondary small"
+                onClick={() => setSalaryMonth(month)}
+              >
+                <Wallet size={16} />
+                Aylıq maaş
+              </button>
+            </div>
+          </div>
+        )}
+        {page === "records" && (
+          <>
+            <Stats entries={filteredEntries} data={data} compact />
+            {!data.months[month] && period !== "all" && (
+              <p className="setup-note">
+                Məbləği hesablamaq üçün “Aylıq maaş” bölməsində net maaşını və
+                norma saatını daxil et.
+              </p>
+            )}
+            <section
+              className="panel records-panel"
+              aria-label="Əlavə iş qeydləri"
+            >
+              <div className="records-toolbar">
+                <h2>
+                  Qeydlər{" "}
+                  <span className="count-badge">{filteredEntries.length}</span>
+                </h2>
+                {data.entries.length > 0 && (
+                  <div className="record-tools">
                     <label className="search-box">
                       <Search size={17} />
                       <input
                         type="search"
                         aria-label="Qeydlərdə axtar"
-                        placeholder="Mövzu, layihə və ya tarix axtar…"
+                        placeholder="Qeyd axtar…"
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(event) => setSearch(event.target.value)}
                       />
                     </label>
-                    <label className="filter-select">
-                      <ListFilter size={16} />
-                      <select
-                        aria-label="Layihəyə görə filtr"
-                        value={project}
-                        onChange={(e) => setProject(e.target.value)}
-                      >
-                        <option value="">Bütün layihələr</option>
-                        {projects.map((v) => (
-                          <option key={v}>{v}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <button
+                      className="button secondary small"
+                      onClick={exportExcel}
+                      disabled={busy || filteredEntries.length === 0}
+                    >
+                      {busy ? (
+                        <LoaderCircle size={16} className="spin" />
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      <span>Excel ixrac et</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+              {data.entries.length > 0 && (
+                <details className="record-filters">
+                  <summary>
+                    Layihə və əmsal üzrə filtr
+                    {project || multiplierFilter ? " · aktiv" : ""}
+                  </summary>
+                  <div className="filters">
+                    <select
+                      aria-label="Layihəyə görə filtr"
+                      value={project}
+                      onChange={(event) => setProject(event.target.value)}
+                    >
+                      <option value="">Bütün layihələr</option>
+                      {projects.map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
                     <select
                       aria-label="Əmsala görə filtr"
                       value={multiplierFilter}
-                      onChange={(e) => setMultiplierFilter(e.target.value)}
+                      onChange={(event) =>
+                        setMultiplierFilter(event.target.value)
+                      }
                     >
                       <option value="">Bütün əmsallar</option>
                       <option value="1">1x</option>
@@ -726,19 +614,18 @@ export default function OvertimeApp() {
                     </select>
                     {(search || project || multiplierFilter) && (
                       <button
-                        className="icon-button"
-                        aria-label="Filtrləri təmizlə"
+                        className="text-link"
                         onClick={() => {
                           setSearch("");
                           setProject("");
                           setMultiplierFilter("");
                         }}
                       >
-                        <X size={17} />
+                        Təmizlə
                       </button>
                     )}
                   </div>
-                </>
+                </details>
               )}
               {visibleEntries.length > 0 ? (
                 <>
@@ -841,189 +728,172 @@ export default function OvertimeApp() {
                       </tbody>
                     </table>
                   </div>
-                  {page === "records" && (
-                    <div className="pagination">
+
+                  <div className="pagination">
+                    <span>
+                      {filteredEntries.length} qeyddən{" "}
+                      {(actualPage - 1) * 15 + 1}–
+                      {Math.min(actualPage * 15, filteredEntries.length)}
+                    </span>
+                    <div>
+                      <button
+                        className="icon-button"
+                        aria-label="Əvvəlki səhifə"
+                        disabled={actualPage === 1}
+                        onClick={() => setPageNumber(actualPage - 1)}
+                      >
+                        <ChevronLeft size={17} />
+                      </button>
                       <span>
-                        {filteredEntries.length} qeyddən{" "}
-                        {(actualPage - 1) * 15 + 1}–
-                        {Math.min(actualPage * 15, filteredEntries.length)}
+                        {actualPage} / {totalPages}
                       </span>
-                      <div>
-                        <button
-                          className="icon-button"
-                          aria-label="Əvvəlki səhifə"
-                          disabled={actualPage === 1}
-                          onClick={() => setPageNumber(actualPage - 1)}
-                        >
-                          <ChevronLeft size={17} />
-                        </button>
-                        <span>
-                          {actualPage} / {totalPages}
-                        </span>
-                        <button
-                          className="icon-button"
-                          aria-label="Növbəti səhifə"
-                          disabled={actualPage === totalPages}
-                          onClick={() => setPageNumber(actualPage + 1)}
-                        >
-                          <ChevronRight size={17} />
-                        </button>
-                      </div>
+                      <button
+                        className="icon-button"
+                        aria-label="Növbəti səhifə"
+                        disabled={actualPage === totalPages}
+                        onClick={() => setPageNumber(actualPage + 1)}
+                      >
+                        <ChevronRight size={17} />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </>
               ) : (
                 <EmptyState
-                  icon={<Clock3 size={29} />}
+                  icon={<Clock3 size={27} />}
                   title={
                     search || project || multiplierFilter
                       ? "Uyğun qeyd tapılmadı"
-                      : "İlk saatını qeyd et"
+                      : "Hələ qeyd yoxdur"
                   }
                   description={
                     search || project || multiplierFilter
-                      ? "Axtarış sözünü və ya filtrləri dəyişərək yenidən yoxla."
-                      : "Əlavə işlədiyin vaxtı qeyd et, qazancını bizimlə izləməyə başla."
+                      ? "Axtarışı və ya filtrləri dəyiş."
+                      : "Yeni qeyd əlavə et və ya əvvəlki Excel faylını yüklə."
                   }
                   action={
                     !search && !project && !multiplierFilter ? (
-                      <div className="empty-actions">
-                        <button className="button primary" onClick={openNew}>
-                          <Plus size={17} />
-                          İlk qeydi əlavə et
-                        </button>
-                        <button
-                          className="text-link"
-                          onClick={() => fileInput.current?.click()}
-                          disabled={busy}
-                        >
-                          Excel-dən idxal et
-                        </button>
-                      </div>
+                      <button
+                        className="text-link"
+                        onClick={() => fileInput.current?.click()}
+                        disabled={busy}
+                      >
+                        <Upload size={16} />
+                        Excel-dən idxal et
+                      </button>
                     ) : undefined
                   }
                 />
               )}
             </section>
-          )}
-          {page === "analytics" && (
-            <>
-              <Stats entries={selectedEntries} data={data} />
+          </>
+        )}
+        {page === "analytics" && (
+          <>
+            <Stats entries={selectedEntries} data={data} compact />
+            <div className="analytics-grid">
+              <Trend data={data} month={period} />
+              <Breakdown
+                entries={selectedEntries}
+                field="project"
+                title="Layihələr üzrə"
+                subtitle="Layihələrə sərf olunan vaxt"
+              />
+            </div>
+            <details className="analysis-details">
+              <summary>Daha ətraflı analiz</summary>
+              <ActivitySummary entries={selectedEntries} />
               <div className="analytics-grid">
-                <Trend data={data} month={period} />
                 <Multipliers entries={selectedEntries} data={data} />
-                <Breakdown
-                  entries={selectedEntries}
-                  field="project"
-                  title="Layihələr üzrə"
-                  subtitle="Ən çox vaxt ayırdığın layihələr"
-                />
                 <Breakdown
                   entries={selectedEntries}
                   field="customer"
                   title="Müştərilər üzrə"
-                  subtitle="Müştərilərə sərf olunan əlavə vaxt"
+                  subtitle="Müştərilərə sərf olunan vaxt"
                 />
                 <Weekdays entries={selectedEntries} />
                 <Breakdown
                   entries={selectedEntries}
                   field="reason"
                   title="Səbəblər üzrə"
-                  subtitle="Əlavə işə səbəb olan tapşırıqlar"
+                  subtitle="Əlavə işin səbəbləri"
                 />
                 <Breakdown
                   entries={selectedEntries}
                   field="environment"
                   title="İş mühiti üzrə"
-                  subtitle="Ofisdə və məsafədən işlədiyin vaxt"
+                  subtitle="Ofis və məsafədən iş"
                 />
                 <MonthComparison data={data} month={month} />
               </div>
-            </>
-          )}
-          {page === "data" && (
-            <div className="data-page">
-              <div className="privacy-banner">
-                <ShieldCheck size={27} />
+            </details>
+          </>
+        )}
+        {page === "data" && (
+          <div className="data-page">
+            <section
+              className="panel file-actions"
+              aria-label="Fayl əməliyyatları"
+            >
+              <div className="data-card file-row">
+                <FileJson size={23} />
                 <div>
-                  <h2>Məlumatların sənin nəzarətindədir.</h2>
+                  <h2>JSON ehtiyat nüsxəsi</h2>
                   <p>
-                    Bu versiyada hesabla giriş və bulud sinxronizasiyası yoxdur.
-                    Məlumatlar bu cihazın bu brauzerindədir. Brauzer
-                    məlumatlarını silmək qeydləri də silir. Başqa cihazda davam
-                    etmək üçün JSON nüsxəni idxal et.
+                    Bütün qeydlər və maaş ayarları. Başqa cihazda bərpa edə
+                    bilərsən.
                   </p>
-                </div>
-              </div>
-              <div className="data-cards">
-                <section className="panel data-card">
-                  <div className="file-icon json-icon">
-                    <FileJson size={27} />
-                  </div>
-                  <h2>Tam ehtiyat nüsxə</h2>
-                  <p>
-                    Bütün qeydlər, aylıq maaşlar və yadda saxladığın sahələr bir
-                    JSON faylında. Tam bərpa üçün ən uyğun seçim.
-                  </p>
-                  <div className="file-meta">
+                  <small>
                     {data.entries.length} qeyd ·{" "}
                     {Object.keys(data.months).length} aylıq maaş ayarı
-                  </div>
-                  <button className="button primary" onClick={exportJson}>
-                    <Download size={17} />
-                    JSON endir
-                  </button>
-                </section>
-                <section className="panel data-card">
-                  <div className="file-icon excel-icon">
-                    <FileSpreadsheet size={27} />
-                  </div>
+                  </small>
+                </div>
+                <button className="button secondary" onClick={exportJson}>
+                  <Download size={16} />
+                  JSON endir
+                </button>
+              </div>
+              <div className="data-card file-row">
+                <FileSpreadsheet size={23} />
+                <div>
                   <h2>Excel hesabatı</h2>
                   <p>
-                    Göndərdiyin cədvəlin 14 sütunu, sonda əmsal, saatlıq tarif
-                    və məbləğ. Ayrı vərəqdə aylıq yekun.
+                    Qeydlərin və aylıq yekun, şirkət cədvəlinə uyğun formatda.
                   </p>
                   <div className="data-period">
-                    <label htmlFor="export-period">İxrac dövrü</label>
+                    <label htmlFor="export-period">Dövr</label>
                     <select
                       id="export-period"
                       value={period}
-                      onChange={(e) => setPeriod(e.target.value)}
+                      onChange={(event) => setPeriod(event.target.value)}
                     >
                       <option value="all">Bütün tarixlər</option>
-                      {months.map((m) => (
-                        <option key={m} value={m}>
-                          {monthLabel(m)}
+                      {months.map((key) => (
+                        <option key={key} value={key}>
+                          {monthLabel(key)}
                         </option>
                       ))}
                     </select>
                   </div>
-                  <button
-                    className="button secondary"
-                    onClick={exportExcel}
-                    disabled={busy || selectedEntries.length === 0}
-                  >
-                    <Download size={17} />
-                    Excel endir
-                  </button>
-                </section>
-              </div>
-              <section className="panel import-panel">
-                <div className="file-icon import-icon">
-                  <Upload size={26} />
                 </div>
+                <button
+                  className="button secondary"
+                  onClick={exportExcel}
+                  disabled={busy || selectedEntries.length === 0}
+                >
+                  <Download size={16} />
+                  Excel endir
+                </button>
+              </div>
+              <div className="file-row">
+                <Upload size={23} />
                 <div>
-                  <h2>Əvvəlki qeydlərini gətir</h2>
+                  <h2>Fayldan idxal et</h2>
                   <p>
-                    JSON ehtiyat nüsxəni və ya mövcud Excel hesabatını seç.
-                    Əvvəlcə məlumatın icmalını görəcəksən, sonra idxalı
-                    təsdiqləyəcəksən.
+                    Əvvəlki JSON və ya Excel faylını yüklə. Əlavə etməzdən əvvəl
+                    yoxlayacaqsan.
                   </p>
-                  <div className="import-tags">
-                    <span>.json</span>
-                    <span>.xlsx</span>
-                    <span>Ən çox 10 MB</span>
-                  </div>
+                  <small>.json və .xlsx · ən çox 10 MB</small>
                 </div>
                 <button
                   className="button primary"
@@ -1031,49 +901,48 @@ export default function OvertimeApp() {
                   disabled={busy}
                 >
                   {busy ? (
-                    <LoaderCircle size={17} className="spin" />
+                    <LoaderCircle size={16} className="spin" />
                   ) : (
-                    <FolderOpen size={17} />
+                    <FolderOpen size={16} />
                   )}
                   Fayl seç
                 </button>
-              </section>
-              <section className="panel import-notes">
-                <h3>İdxal haqqında</h3>
-                <ul>
-                  <li>
-                    Excel-də <strong>Tarix, Başlanma və Bitmə</strong> sütunları
-                    olmalıdır. Azərbaycan dilində göndərdiyin başlıqlar
-                    dəstəklənir.
-                  </li>
-                  <li>
-                    Maaş və tarif olmayan Excel qeydləri saat analizində
-                    görünür. Aylıq maaş ayarı əlavə edəndə məbləğ hesablanır.
-                  </li>
-                  <li>
-                    Excel-də eyni başlanma–bitmə aralığından qısa müddət
-                    göstərilibsə, fərq fasilə kimi qəbul edilir.
-                  </li>
-                  <li>
-                    JSON tam bərpa üçündür; Excel aylıq maaş ayarlarını və
-                    profilini saxlamır.
-                  </li>
-                  <li>
-                    İdxal zamanı təkrarlanan qeydlər ötürülür. Səhv sətirlər
-                    aşkarlansa, fayldan heç bir qeyd əlavə edilmir.
-                  </li>
-                </ul>
-              </section>
-            </div>
-          )}
-          <footer className="page-footer">
-            <span>Az vaxt qeyd etməyə, çox vaxt özünə.</span>
-            <span>
-              overtime<span className="brand-period">.</span>
-            </span>
-          </footer>
-        </main>
-      </div>
+              </div>
+            </section>
+            <p className="local-note">
+              <ShieldCheck size={16} />
+              Qeydlər bu brauzerdə saxlanır. Cihazlar arasında köçürmək üçün
+              JSON nüsxəsi istifadə et.
+            </p>
+            <details className="guide-details">
+              <summary>İdxal qaydaları</summary>
+              <ul>
+                <li>Excel-də Tarix, Başlanma və Bitmə sütunları olmalıdır.</li>
+                <li>
+                  Tarifi olmayan köhnə qeydlər saat analizində görünür. Məbləğ
+                  üçün aylıq maaş ayarını daxil et.
+                </li>
+                <li>
+                  Müddət vaxt aralığından qısadırsa fərq fasilə kimi qəbul
+                  edilir.
+                </li>
+                <li>
+                  JSON tam ehtiyat nüsxəsidir; Excel profil və aylıq maaş
+                  ayarlarını daşımır.
+                </li>
+                <li>
+                  Təkrar qeydlər ötürülür. Səhv sətir varsa bütün idxal
+                  dayandırılır.
+                </li>
+              </ul>
+            </details>
+          </div>
+        )}
+        <footer className="page-footer">
+          <span>ArtıSaat</span>
+          <span>Məlumatların bu cihazda qalır.</span>
+        </footer>
+      </main>
       <input
         ref={fileInput}
         type="file"
@@ -1191,7 +1060,7 @@ export default function OvertimeApp() {
         />
       )}
       {help && (
-        <Modal title="Overtime necə işləyir?" close={() => setHelp(false)}>
+        <Modal title="ArtıSaat necə işləyir?" close={() => setHelp(false)}>
           <div className="modal-body help-content">
             <div>
               <span>01</span>

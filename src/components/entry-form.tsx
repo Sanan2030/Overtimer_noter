@@ -53,8 +53,8 @@ export function EntryForm({
   const overnight = entry.end < entry.start;
   return (
     <Modal
-      title={editing ? "Qeydi redaktə et" : "Yeni overtime qeydi"}
-      subtitle="İşlədiyin vaxtı əlavə et. Qalanını biz hesablayaq."
+      title={editing ? "Qeydi redaktə et" : "Yeni əlavə iş qeydi"}
+      subtitle="Tarix və saatları daxil et. Məbləğ avtomatik hesablanır."
       close={close}
       wide
     >

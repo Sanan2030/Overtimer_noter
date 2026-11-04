@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Overtime — Vaxtınızın dəyəri",
+  title: "ArtıSaat — Əlavə iş saatları",
   description:
     "Əlavə iş saatlarınızı qeyd edin, gəlirinizi hesablayın və Excel hesabatınızı hazırlayın.",
 };
