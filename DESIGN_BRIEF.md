@@ -42,7 +42,7 @@ Məsələn, 1 200 AZN / 160 saat = 7,50 AZN/saat. 18:00–20:00 aralığı 1x ü
 - Analiz: iki yekun göstərici, aylıq trend və layihə bölgüsü. Digər qrafiklər “Daha ətraflı analiz” altında açılır.
 - Fayllar: JSON endir, Excel endir, Fayl seç. İdxalın əvvəlcədən icmalı və təsdiqi saxlanılır.
 
-Excel-də ilk 14 sütun bu ardıcıllıqdadır: İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb. Sonra Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN) gəlir. Aylıq yekun ayrıca vərəqdədir.
+Excel-də yalnız bu 14 sütun var: İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb. Bir vərəq, açıq yaşıl başlıq və incə yaşıl çərçivə (seçilmiş 2-ci variant). Əlavə sütun, başlıq və yekun sətri yoxdur. Maaş və əmsal daxil bütün məlumatları saxlamaq üçün JSON istifadə edilir.
 
 ## Başqa AI-yə veriləcək prompt
 

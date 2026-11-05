@@ -71,13 +71,13 @@ Hər domen və brauzer profili ayrıca yaddaşdır. Eyni profili paylaşan şəx
 
 ## Excel hesabatı
 
-Fayl **Aylıq yekun** vərəqi ilə açılır: ay, maaş, rəsmi norma, saatlıq tarif, overtime müddəti, qeyd sayı, məbləğ və tarifsiz qeydlər. Sonda cəmi və rəsmi mənbə linki var.
-
-**Overtime qeydləri** vərəqində ilk 14 sütun şirkət formatına uyğundur:
+Seçilmiş **2-ci variant**: açıq yaşıl başlıq, ağ sətirlər, incə yaşıl çərçivə və bir `Overtime` vərəqi. İlk sətirdən yalnız bu 14 sütun verilir:
 
 İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb.
 
-Sonda Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN) gəlir. Əvvəlki gecə əlavəli Excel hesabatı idxal ediləndə əsas saatlıq tarif qorunur, gecə əlavəsi yeni məbləğə daşınmır. Qruplaşdırılmış başlıqlar, mətnə uyğun sətir hündürlüyü, incə xətlər, növbələnən sətir rəngi, cəmi sətri, filtr, sabit başlıq və pul/tarix/saat formatları tətbiq olunur. Aylıq yekun A4, detallı cədvəl A3 üfüqi çap üçün qurulub; hər səhifədə başlıq təkrarlanır.
+Əlavə başlıq, yekun sətri, maaş/əmsal/məbləğ sütunu və hesabat vərəqi yoxdur. Tarix `02.10.2026`, vaxt `18:00`, müddət `03:00` formatındadır. Uzun mətnlər sətirə bölünür; başlıq sabitlənir, A3 üfüqi çapda təkrarlanır. Excel iş qeydlərini daşıyır; maliyyə və profil ayarları daxil olmaqla tam ehtiyat nüsxəsi üçün JSON istifadə edilir.
+
+Excel təkrar idxal ediləndə uyğun iş qeydləri ötürülür və mövcud qeydlərin əmsalı/məbləği qorunur. Başqa brauzerdə idxal zamanı əmsal sütunu olmayan Excel qeydləri əvvəlki kimi 1x və tarifsiz açılır; maaş və əmsal tətbiqdə təyin edilir. Əvvəlki əlavə maliyyə sütunları olan Excel fayllarının idxalı da dəstəklənir.
 
 İdxal `.xlsx` və `.json` üçün ən çox 10 MB / 50 000 qeyddir. Excel-də Tarix, Başlanma və Bitmə başlıqları ilk 30 sətirdə olmalıdır. Köhnə 14 sütunlu və yeni format idxal olunur. Səhv sətir varsa bütün idxal dayandırılır. Köhnə `.xls` faylını əvvəlcə `.xlsx` kimi saxlayın.
 

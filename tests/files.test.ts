@@ -4,7 +4,6 @@ import ExcelJS from "exceljs";
 import {
   createWorkbook,
   EXCEL_HEADERS,
-  REPORT_HEADER_ROW,
   jsonBackup,
   parseBackup,
   parseWorkbook,
@@ -68,7 +67,7 @@ test("imports the original 14-column company format without a rate", async () =>
   assert.equal(amount(row, {}), null);
   assert.equal(amount(row, { "2026-10": { salary: 1320, hours: 176 } }), 22.5);
 });
-test("XLSX round trip preserves overnight, breaks, numeric times, amount and exact headers", async () => {
+test("XLSX exports the chosen green company table and preserves work fields on reimport", async () => {
   const row = {
     ...newEntry(
       { ...emptyProfile, employee: "İnci", project: "AzDoc" },
@@ -98,23 +97,44 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
     30,
   );
   assert.equal(imported.entries[0].subject, row.subject);
-  assert.equal(
-    imported.entries.reduce((sum, row) => sum + amount(row, {})!, 0),
-    78.76,
+  assert.ok(
+    imported.entries.every((row) => row.rate === null && row.multiplier === 1),
   );
-  assert.equal(mergeData(data, imported).added, 0);
+  const merged = mergeData(data, imported, { matchByWork: true });
+  assert.equal(merged.added, 0);
+  assert.equal(merged.data.entries[0].multiplier, 3);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer.buffer as ArrayBuffer);
-  const sheet = workbook.getWorksheet("Overtime qeydləri")!;
-  assert.deepEqual(
-    (sheet.getRow(REPORT_HEADER_ROW).values as string[]).slice(1),
-    EXCEL_HEADERS,
-  );
-  assert.equal(sheet.getCell("M7").type, ExcelJS.ValueType.String);
-  assert.equal(
-    workbook.getWorksheet("Aylıq yekun")!.getCell("G7").value,
-    78.76,
-  );
+  await workbook.xlsx.load(Uint8Array.from(buffer).buffer);
+  assert.equal(workbook.worksheets.length, 1);
+  const sheet = workbook.getWorksheet("Overtime")!;
+  assert.equal(sheet.rowCount, 3);
+  assert.equal(sheet.columnCount, 14);
+  assert.deepEqual((sheet.getRow(1).values as string[]).slice(1), [
+    "İl",
+    "Ay",
+    "Əməkdaş",
+    "Şöbə müdiri",
+    "Müştəri",
+    "Layihə",
+    "Tarix",
+    "Başlanma",
+    "Bitmə",
+    "İcra günü statusu",
+    "İş mühiti",
+    "Müddət\u00a0\n(saat: dəqiqə)",
+    "Mövzu",
+    "Səbəb",
+  ]);
+  assert.equal(sheet.getCell("M2").type, ExcelJS.ValueType.String);
+  assert.equal(sheet.getCell("M2").value, row.subject);
+  assert.deepEqual(sheet.getCell("A1").fill, {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE6F1E8" },
+  });
+  assert.equal(sheet.getColumn(7).numFmt, "dd.mm.yyyy");
+  assert.equal(sheet.getColumn(8).numFmt, "hh:mm");
+  assert.equal(sheet.getColumn(12).numFmt, "[hh]:mm");
 });
 test("invalid Excel rows reject the whole file with row diagnostics", async () => {
   const buffer = await source([
@@ -179,7 +199,7 @@ test("negative or inconsistent money columns are not silently changed", async ()
   );
 });
 
-test("month-boundary Excel includes separate net tariffs without night premiums and reimports without duplicates", async () => {
+test("month-boundary Excel contains only the two dated work parts and reimports without duplicates", async () => {
   const row = {
     ...newEntry(emptyProfile, "2026-10-31"),
     start: "19:00",
@@ -196,50 +216,37 @@ test("month-boundary Excel includes separate net tariffs without night premiums 
   const bytes = await createWorkbook(data);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
-  const summary = workbook.getWorksheet("Aylıq yekun")!;
-  assert.equal(summary.getCell("B6").value, "Net maaş (AZN)");
-  assert.equal(summary.getCell("B7").value, 1320);
-  assert.equal(summary.getCell("C7").value, 176);
-  assert.equal(summary.getCell("C8").value, 152);
-  assert.equal(summary.getCell("G7").value, 75);
-  assert.equal(summary.getCell("G8").value, 34.74);
-  const details = workbook.getWorksheet("Overtime qeydləri")!;
-  assert.equal(details.getCell("I7").value, "24:00");
-  assert.equal(details.columnCount, 17);
-  const imported = await parseWorkbook(Uint8Array.from(bytes).buffer);
-  assert.equal(imported.entries.length, 2);
-  assert.ok(
-    Math.abs(
-      imported.entries.reduce((sum, e) => sum + amount(e, {})!, 0) - 109.74,
-    ) < 1e-9,
-  );
-  assert.equal(mergeData(data, imported).added, 0);
-  assert.equal(mergeData(emptyData(), imported).added, 2);
+  assert.equal(workbook.worksheets.length, 1);
+  const details = workbook.getWorksheet("Overtime")!;
+  assert.equal(details.columnCount, 14);
+  assert.equal(details.rowCount, 3);
   assert.equal(
-    mergeData(mergeData(emptyData(), imported).data, imported).added,
-    0,
+    (details.getCell("G2").value as Date).toISOString().slice(0, 10),
+    "2026-10-31",
   );
+  assert.equal(
+    (details.getCell("G3").value as Date).toISOString().slice(0, 10),
+    "2026-11-01",
+  );
+  assert.equal(details.getCell("I2").value, "24:00");
+  const imported = await parseWorkbook(Uint8Array.from(bytes).buffer);
+  assert.deepEqual(
+    imported.entries.map((e) => durationMinutes(e)),
+    [300, 120],
+  );
+  assert.equal(mergeData(data, imported, { matchByWork: true }).added, 0);
+  const first = mergeData(emptyData(), imported, { matchByWork: true });
+  assert.equal(first.added, 2);
+  assert.equal(mergeData(first.data, imported, { matchByWork: true }).added, 0);
 });
 
-test("Excel leaves previous gross salaries unpriced until net salary is entered", async () => {
-  const data = {
-    ...emptyData(),
-    months: {
-      "2026-10": { salary: 1320, hours: 176, basis: "gross" as const },
-    },
-    entries: [{ ...newEntry(emptyProfile, "2026-10-02"), rate: 7.5 }],
-  };
-  const bytes = await createWorkbook(data);
+test("an empty export contains just the company column headers", async () => {
+  const bytes = await createWorkbook(emptyData());
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
-  const summary = workbook.getWorksheet("Aylıq yekun")!;
-  assert.equal(summary.getCell("B7").value, null);
-  assert.equal(summary.getCell("D7").value, null);
-  assert.equal(summary.getCell("G7").value, 0);
-  assert.equal(summary.getCell("H7").value, 1);
-  const details = workbook.getWorksheet("Overtime qeydləri")!;
-  assert.equal(details.getCell("P7").value, null);
-  assert.equal(details.getCell("Q7").value, null);
+  assert.equal(workbook.worksheets.length, 1);
+  assert.equal(workbook.worksheets[0].rowCount, 1);
+  assert.equal(workbook.worksheets[0].columnCount, 14);
 });
 
 test("old Excel night premiums are stripped while preserving the original hourly tariff", async () => {

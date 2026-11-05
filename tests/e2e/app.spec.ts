@@ -118,18 +118,34 @@ test("imports original Excel, prices old records, exports matching columns and s
   await expect(page.getByRole("dialog")).toContainText("0 yeni qeyd");
   await page.getByRole("button", { name: "Qeydləri idxal et" }).click();
   await expect(page.getByRole("row")).toHaveCount(2);
+  await row.getByRole("button", { name: /qeydini redaktə et/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "3x", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Dəyişiklikləri saxla" }).click();
+  await expect(row).toContainText("67,50");
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Excel ixrac et" }).click();
   const download = await downloadPromise;
   const exported = new ExcelJS.Workbook();
   await exported.xlsx.readFile((await download.path())!);
-  expect(exported.getWorksheet("Overtime qeydləri")!.getCell("Q7").value).toBe(
-    22.5,
-  );
-  expect(exported.getWorksheet("Overtime qeydləri")!.getCell("M6").value).toBe(
-    "Mövzu",
-  );
-  expect(exported.getWorksheet("Aylıq yekun")!.getCell("F7").value).toBe(1);
+  expect(exported.worksheets).toHaveLength(1);
+  const exportedSheet = exported.getWorksheet("Overtime")!;
+  expect(exportedSheet.columnCount).toBe(14);
+  expect(exportedSheet.rowCount).toBe(2);
+  expect(exportedSheet.getCell("M1").value).toBe("Mövzu");
+  expect(exportedSheet.getCell("C2").value).toBe("İnci Məmmədzadə");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "yeniden.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: await readFile((await download.path())!),
+  });
+  await expect(page.getByRole("dialog")).toContainText("0 yeni qeyd");
+  await page.getByRole("button", { name: "Qeydləri idxal et" }).click();
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await expect(row).toContainText("67,50");
 });
 
 test("JSON restore survives navigation and repeated imports, each browser starts isolated", async ({

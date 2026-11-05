@@ -361,3 +361,18 @@ test("gross months cannot supply a net tariff or fall back to old gross snapshot
     gross,
   );
 });
+
+test("Excel can match work fields while JSON retains entries with distinct multipliers", () => {
+  const one = entry({ multiplier: 1 });
+  const three = { ...one, id: crypto.randomUUID(), multiplier: 3 as const };
+  const imported = { ...emptyData(), entries: [one, three] };
+  assert.equal(mergeData(emptyData(), imported).added, 2);
+  const current = { ...emptyData(), entries: [three] };
+  const excel = mergeData(
+    current,
+    { ...emptyData(), entries: [one] },
+    { matchByWork: true },
+  );
+  assert.equal(excel.added, 0);
+  assert.equal(excel.data.entries[0].multiplier, 3);
+});

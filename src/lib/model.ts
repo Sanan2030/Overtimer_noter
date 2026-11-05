@@ -402,9 +402,14 @@ export function validateData(value: unknown): AppData {
 export function mergeData(
   current: AppData,
   imported: AppData,
+  options: { matchByWork?: boolean } = {},
 ): { data: AppData; added: number; skipped: number } {
-  const seen = new Set(current.entries.map(fingerprint));
-  const dailySeen = new Set(dailyEntries(current.entries).map(fingerprint));
+  // The company Excel format has no multiplier. Match its work fields while
+  // retaining the existing record's payment settings. JSON keeps exact matching.
+  const matchKey = (entry: Entry) =>
+    fingerprint(options.matchByWork ? { ...entry, multiplier: 1 } : entry);
+  const seen = new Set(current.entries.map(matchKey));
+  const dailySeen = new Set(dailyEntries(current.entries).map(matchKey));
   const ids = new Set(current.entries.map((e) => e.id));
   const months = { ...imported.months, ...current.months };
   const added: Entry[] = [];
@@ -419,14 +424,14 @@ export function mergeData(
     };
     const parts = dailyEntries([entry], imported.months);
     if (
-      seen.has(fingerprint(entry)) ||
-      parts.every((part) => dailySeen.has(fingerprint(part)))
+      seen.has(matchKey(entry)) ||
+      parts.every((part) => dailySeen.has(matchKey(part)))
     )
       continue;
     // A previously imported monthly report may contain only one side of a shift.
     // Add its missing side without duplicating the already imported hours.
-    const candidates = parts.some((part) => dailySeen.has(fingerprint(part)))
-      ? parts.filter((part) => !dailySeen.has(fingerprint(part)))
+    const candidates = parts.some((part) => dailySeen.has(matchKey(part)))
+      ? parts.filter((part) => !dailySeen.has(matchKey(part)))
       : [entry];
     for (const candidate of candidates) {
       const { sourceId: _source, ...saved } = candidate;
@@ -434,8 +439,8 @@ export function mergeData(
       ids.add(saved.id);
       added.push(saved);
     }
-    parts.forEach((part) => dailySeen.add(fingerprint(part)));
-    seen.add(fingerprint(entry));
+    parts.forEach((part) => dailySeen.add(matchKey(part)));
+    seen.add(matchKey(entry));
   }
   return {
     data: { ...current, months, entries: [...current.entries, ...added] },

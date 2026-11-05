@@ -357,7 +357,9 @@ export default function OvertimeApp() {
         `artisaat-${period}.xlsx`,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
-      notify(`${entries.length} qeyd və aylıq yekun Excel faylına yazıldı.`);
+      notify(
+        `${entries.length} qeyd şirkət cədvəli formatında Excel faylına yazıldı.`,
+      );
     } catch (err) {
       notify((err as Error).message || "Excel faylı hazırlana bilmədi.", true);
     } finally {
@@ -953,7 +955,8 @@ export default function OvertimeApp() {
                 <div>
                   <h2>Excel hesabatı</h2>
                   <p>
-                    Qeydlərin və aylıq yekun, şirkət cədvəlinə uyğun formatda.
+                    Seçdiyin qeydlər, açıq yaşıl başlıqlı 14 sütunlu şirkət
+                    cədvəlində.
                   </p>
                   <div className="data-period">
                     <label htmlFor="export-period">Dövr</label>
@@ -1022,8 +1025,8 @@ export default function OvertimeApp() {
                   edilir.
                 </li>
                 <li>
-                  JSON tam ehtiyat nüsxəsidir; Excel profil və aylıq maaş
-                  ayarlarını daşımır.
+                  JSON tam ehtiyat nüsxəsidir; Excel profil, maaş, əmsal və
+                  məbləği daşımır.
                 </li>
                 <li>
                   Təkrar qeydlər ötürülür. Səhv sətir varsa bütün idxal
@@ -1137,7 +1140,9 @@ export default function OvertimeApp() {
                 added = pendingImport.data.entries.length;
                 return pendingImport.data;
               }
-              const result = mergeData(old, pendingImport.data);
+              const result = mergeData(old, pendingImport.data, {
+                matchByWork: pendingImport.mode === "excel",
+              });
               added = result.added;
               skipped = result.skipped;
               return result.data;
@@ -1191,9 +1196,9 @@ export default function OvertimeApp() {
               <span>04</span>
               <h3>Hesabatını hazırla</h3>
               <p>
-                Excel ixracında ilk 14 sütun şirkət cədvəlinə uyğundur; əlavə
-                sütunlarda əmsal, tarif və məbləğ görünür. Aylıq yekun ayrıca
-                vərəqdədir. Hesabat daxil etdiyin net maaş əsasında hazırlanır.
+                Excel yalnız şirkət cədvəlinin 14 sütununu saxlayır. Maaş, əmsal
+                və məbləğ daxil olmaqla bütün məlumatları qorumaq üçün JSON
+                ehtiyat nüsxəsini endir.
                 <a
                   href="https://e-qanun.az/framework/46943"
                   target="_blank"
@@ -1385,7 +1390,9 @@ function ImportPreview({
 }) {
   const [replace, setReplace] = useState(corrupt);
   const [confirmed, setConfirmed] = useState(false);
-  const preview = mergeData(current, pending.data);
+  const preview = mergeData(current, pending.data, {
+    matchByWork: pending.mode === "excel",
+  });
   const dates = pending.data.entries.map((e) => e.date).sort();
   return (
     <Modal title="İdxalı yoxla" subtitle={pending.filename} close={close}>
@@ -1458,7 +1465,7 @@ function ImportPreview({
               Hazırkı {current.entries.length} qeyd, profil və maaş ayarları
               silinərək fayldakı məlumatla əvəz olunacaq.
               {pending.mode === "excel" &&
-                " Excel maaş ayarları və profil daşımır."}
+                " Excel maaş, əmsal və profil ayarlarını daşımır."}
             </p>
           </div>
         </label>
