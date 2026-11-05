@@ -161,29 +161,12 @@ export function EntryForm({
               )}
             </div>
           </div>
-          <Field label="Gecə əlavəsi (%)">
-            <input
-              type="number"
-              min="0"
-              max="1000"
-              step="0.01"
-              value={entry.nightPercent ?? 0}
-              onChange={(event) =>
-                update("nightPercent", Number(event.target.value))
-              }
-            />
-            <small className="muted">
-              22:00–06:00 · adi gecə işi üçün 20%; çoxnövbəli rejimdə gecə
-              növbəsi üçün 40%. Müqaviləndəki uyğun faizi daxil et. Əlavə
-              saatlıq tarifə hesablanır.
-            </small>
-          </Field>
           <p className="muted small-copy">
             2x normadan artıq iş üçündür. İstirahət/bayram günü aylıq norma
             daxilində iş üçün 1x maaşdan əlavə ödənişdir. Tətbiq normal iş
             saatlarını uçota almadığı üçün bu fərqi özü müəyyən etmir.{" "}
             <a href={LABOUR_CODE_URL} target="_blank" rel="noreferrer">
-              Maddə 164–166 ↗
+              Maddə 164–165 ↗
             </a>
           </p>
           <div className="calculation">
@@ -203,7 +186,7 @@ export function EntryForm({
                   ? "Tarif təyin edilməyib"
                   : parts.length > 1
                     ? "Hər günün tarifi ilə · bölgü aşağıdadır"
-                    : `${money(rate)} ₼ / saat × ${entry.multiplier} + gecə`}
+                    : `${money(rate)} ₼ / saat × ${entry.multiplier}`}
               </span>
               <strong>
                 {total === null ? "—" : money(total)} <small>AZN</small>
@@ -221,7 +204,6 @@ export function EntryForm({
                     </strong>
                     <small>
                       {monthLabel(part.month)} · norma: {part.norm ?? "—"} saat
-                      · gecə: {formatDuration(part.nightMinutes)}
                     </small>
                   </div>
                   <div>
@@ -233,7 +215,7 @@ export function EntryForm({
                     <small>
                       {part.base === null
                         ? "Bu ayın maaşını daxil et"
-                        : `${money(part.base)} ₼ əsas + ${money(part.supplement!)} ₼ gecə`}
+                        : `${formatDuration(part.minutes)} saat × ${money(part.rate!)} ₼ × ${entry.multiplier}`}
                     </small>
                   </div>
                 </div>

@@ -179,7 +179,7 @@ test("negative or inconsistent money columns are not silently changed", async ()
   );
 });
 
-test("month-boundary Excel includes separate norms, rates and additive night premiums and reimports without duplicates", async () => {
+test("month-boundary Excel includes separate net tariffs without night premiums and reimports without duplicates", async () => {
   const row = {
     ...newEntry(emptyProfile, "2026-10-31"),
     start: "19:00",
@@ -188,8 +188,8 @@ test("month-boundary Excel includes separate norms, rates and additive night pre
   const data = {
     ...emptyData(),
     months: {
-      "2026-10": { salary: 1320, hours: 176, basis: "gross" as const },
-      "2026-11": { salary: 1320, hours: 152, basis: "gross" as const },
+      "2026-10": { salary: 1320, hours: 176, basis: "net" as const },
+      "2026-11": { salary: 1320, hours: 152, basis: "net" as const },
     },
     entries: [row],
   };
@@ -197,19 +197,20 @@ test("month-boundary Excel includes separate norms, rates and additive night pre
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
   const summary = workbook.getWorksheet("Aylıq yekun")!;
+  assert.equal(summary.getCell("B6").value, "Net maaş (AZN)");
+  assert.equal(summary.getCell("B7").value, 1320);
   assert.equal(summary.getCell("C7").value, 176);
   assert.equal(summary.getCell("C8").value, 152);
-  assert.equal(summary.getCell("G7").value, 78);
-  assert.equal(summary.getCell("G8").value, 38.21);
+  assert.equal(summary.getCell("G7").value, 75);
+  assert.equal(summary.getCell("G8").value, 34.74);
   const details = workbook.getWorksheet("Overtime qeydləri")!;
   assert.equal(details.getCell("I7").value, "24:00");
-  assert.equal(details.getCell("T7").value, 3);
-  assert.equal(details.getCell("T8").value, 3.47);
+  assert.equal(details.columnCount, 17);
   const imported = await parseWorkbook(Uint8Array.from(bytes).buffer);
   assert.equal(imported.entries.length, 2);
   assert.ok(
     Math.abs(
-      imported.entries.reduce((sum, e) => sum + amount(e, {})!, 0) - 116.21,
+      imported.entries.reduce((sum, e) => sum + amount(e, {})!, 0) - 109.74,
     ) < 1e-9,
   );
   assert.equal(mergeData(data, imported).added, 0);
@@ -218,4 +219,36 @@ test("month-boundary Excel includes separate norms, rates and additive night pre
     mergeData(mergeData(emptyData(), imported).data, imported).added,
     0,
   );
+});
+
+test("Excel leaves previous gross salaries unpriced until net salary is entered", async () => {
+  const data = {
+    ...emptyData(),
+    months: {
+      "2026-10": { salary: 1320, hours: 176, basis: "gross" as const },
+    },
+    entries: [{ ...newEntry(emptyProfile, "2026-10-02"), rate: 7.5 }],
+  };
+  const bytes = await createWorkbook(data);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
+  const summary = workbook.getWorksheet("Aylıq yekun")!;
+  assert.equal(summary.getCell("B7").value, null);
+  assert.equal(summary.getCell("D7").value, null);
+  assert.equal(summary.getCell("G7").value, 0);
+  assert.equal(summary.getCell("H7").value, 1);
+  const details = workbook.getWorksheet("Overtime qeydləri")!;
+  assert.equal(details.getCell("P7").value, null);
+  assert.equal(details.getCell("Q7").value, null);
+});
+
+test("old Excel night premiums are stripped while preserving the original hourly tariff", async () => {
+  const bytes = await source([
+    ["Tarix", "Başlanma", "Bitmə", "Məbləğ", "Əmsal", "Gecə əlavəsi (%)"],
+    ["02.10.2026", "22:00", "23:00", 16.5, 2, 20],
+  ]);
+  const imported = await parseWorkbook(bytes);
+  assert.ok(Math.abs(imported.entries[0].rate! - 7.5) < 1e-9);
+  assert.equal(imported.entries[0].nightPercent, undefined);
+  assert.equal(amount(imported.entries[0], {}), 15);
 });

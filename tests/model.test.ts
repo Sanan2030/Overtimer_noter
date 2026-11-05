@@ -4,12 +4,12 @@ import {
   amount,
   calculationParts,
   dailyEntries,
-  nightMinutes,
   validateEntry,
   durationMinutes,
   emptyData,
   emptyProfile,
   formatDuration,
+  hourlyRate,
   isDate,
   mergeData,
   money,
@@ -195,7 +195,7 @@ const twoMonths = {
   "2026-10": { salary: 1320, hours: 176 },
   "2026-11": { salary: 1320, hours: 152 },
 };
-test("31 October 19:00–1 November 02:00 uses 5h/176 and 2h/152 plus four night hours", () => {
+test("31 October 19:00–1 November 02:00 uses each month's net tariff without a night premium", () => {
   const row = entry({
     date: "2026-10-31",
     start: "19:00",
@@ -205,18 +205,16 @@ test("31 October 19:00–1 November 02:00 uses 5h/176 and 2h/152 plus four night
   });
   const parts = calculationParts(row, twoMonths);
   assert.deepEqual(
-    parts.map((p) => [p.month, p.minutes, p.nightMinutes, p.norm]),
+    parts.map((p) => [p.month, p.minutes, p.norm]),
     [
-      ["2026-10", 300, 120, 176],
-      ["2026-11", 120, 120, 152],
+      ["2026-10", 300, 176],
+      ["2026-11", 120, 152],
     ],
   );
   assert.equal(parts[0].base, 75);
-  assert.equal(parts[0].supplement, 3);
-  assert.equal(parts[0].total, 78);
-  assert.equal(parts[1].total, 38.21);
-  assert.equal(amount(row, twoMonths), 116.21);
-  assert.equal(nightMinutes(row), 240);
+  assert.equal(parts[0].total, 75);
+  assert.equal(parts[1].total, 34.74);
+  assert.equal(amount(row, twoMonths), 109.74);
   const ledger = dailyEntries([row], twoMonths);
   assert.equal(ledger[0].sourceId, row.id);
   assert.equal(
@@ -225,7 +223,7 @@ test("31 October 19:00–1 November 02:00 uses 5h/176 and 2h/152 plus four night
   );
   assert.ok(
     Math.abs(
-      ledger.reduce((sum, p) => sum + amount(p, twoMonths)!, 0) - 116.21,
+      ledger.reduce((sum, p) => sum + amount(p, twoMonths)!, 0) - 109.74,
     ) < 1e-9,
   );
   assert.deepEqual(dailyEntries(ledger, twoMonths), ledger);
@@ -243,40 +241,38 @@ test("next month cannot inherit the previous month's snapshot rate", () => {
   assert.equal(calculationParts(row, {})[1].rate, null);
   assert.equal(
     amount({ ...row, rates: { "2026-11": 1320 / 152 } }, {}),
-    116.21,
+    109.74,
   );
   assert.equal(
     amount(row, { ...twoMonths, "2026-11": { salary: 1520, hours: 152 } }),
-    122,
+    115,
   );
 });
-test("night edges are 22:00 inclusive to 06:00 exclusive and the premium is additive", () => {
-  assert.equal(nightMinutes(entry({ start: "21:59", end: "22:01" })), 1);
-  assert.equal(nightMinutes(entry({ start: "05:59", end: "06:01" })), 1);
-  assert.equal(nightMinutes(entry({ start: "06:00", end: "22:00" })), 0);
-  assert.equal(
-    amount(
-      entry({ start: "22:00", end: "23:00", multiplier: 2, nightPercent: 20 }),
-      twoMonths,
-    ),
-    16.5,
-  );
-  assert.equal(
-    amount(
-      entry({ start: "22:00", end: "23:00", multiplier: 3, nightPercent: 40 }),
-      twoMonths,
-    ),
-    25.5,
-  );
+test("old night percentages do not add a premium to current overtime amounts", () => {
+  for (const nightPercent of [0, 20, 40, 100]) {
+    assert.equal(
+      amount(
+        entry({ start: "22:00", end: "23:00", multiplier: 2, nightPercent }),
+        twoMonths,
+      ),
+      15,
+    );
+    assert.equal(
+      amount(
+        entry({ start: "22:00", end: "23:00", multiplier: 3, nightPercent }),
+        twoMonths,
+      ),
+      22.5,
+    );
+  }
 });
 test("midnight endpoints do not create an empty next-day record", () => {
   const row = entry({ date: "2026-10-31", start: "19:00", end: "00:00" });
   assert.equal(dailyEntries([row]).length, 1);
-  assert.equal(nightMinutes(row), 120);
   assert.equal(durationMinutes(validateEntry({ ...row, end: "24:00" })), 300);
   assert.throws(() => validateEntry({ ...row, start: "24:00" }));
 });
-test("old JSON keeps salary basis and night treatment, new entries default to 2x/20%", () => {
+test("old JSON keeps salary basis and new entries default to 2x without a night percentage", () => {
   const row = entry();
   const { nightPercent: _night, ...old } = row;
   const restored = validateData({
@@ -288,11 +284,8 @@ test("old JSON keeps salary basis and night treatment, new entries default to 2x
   assert.equal(restored.months["2026-10"].basis, undefined);
   const fresh = newEntry(emptyProfile, "2026-10-31");
   assert.equal(fresh.multiplier, 2);
-  assert.equal(fresh.nightPercent, 20);
+  assert.equal(fresh.nightPercent, undefined);
   assert.throws(() => validateEntry({ ...row, nightPercent: -1 }));
-  assert.throws(() =>
-    validateEntry({ ...row, nightPercent: 20, breakMinutes: 1 }),
-  );
 });
 
 test("a whole-shift backup fills only the missing side of an imported month report", () => {
@@ -323,5 +316,48 @@ test("a whole-shift backup fills only the missing side of an imported month repo
       entries: [row],
     }).added,
     0,
+  );
+});
+
+test("gross months cannot supply a net tariff or fall back to old gross snapshots", () => {
+  const gross = { salary: 1320, hours: 176, basis: "gross" as const };
+  const row = entry({
+    date: "2026-10-31",
+    start: "19:00",
+    end: "02:00",
+    multiplier: 2,
+    nightPercent: 20,
+    rate: 7.5,
+    rates: { "2026-11": 7.5 },
+  });
+  const months = {
+    "2026-10": { salary: 880, hours: 176, basis: "net" as const },
+    "2026-11": gross,
+  };
+  assert.equal(hourlyRate(gross, "2026-10"), null);
+  assert.equal(amount(row, months), null);
+  assert.deepEqual(
+    calculationParts(row, months).map((p) => p.total),
+    [50, null],
+  );
+  assert.equal(
+    amount(row, {
+      ...months,
+      "2026-11": { salary: 760, hours: 152, basis: "net" },
+    }),
+    70,
+  );
+  assert.equal(
+    amount(
+      { ...row, date: "2026-10-02", start: "18:00", end: "20:00" },
+      { "2026-10": gross },
+    ),
+    null,
+  );
+  assert.deepEqual(
+    validateData({ ...emptyData(), months: { "2026-10": gross } }).months[
+      "2026-10"
+    ],
+    gross,
   );
 });

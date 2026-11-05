@@ -4,7 +4,7 @@ ArtıSaat əməkdaşın əlavə iş saatlarını qeyd etməsi və qarşılığı
 
 ## Tətbiqin etdiyi işlər
 
-1. Hər ayın brutto tarif maaşıını saxlayır; norma iş saatını ƏƏSMN-nin rəsmi təqvimindən tarixə görə avtomatik seçir və saatlıq tarifi hesablayır.
+1. Hər ayın net maaşını saxlayır; norma iş saatını ƏƏSMN-nin rəsmi təqvimindən tarixə görə avtomatik seçir və saatlıq tarifi hesablayır.
 2. Tarix, başlanma və bitmə saatından əlavə iş müddətini çıxarır. Yeni formada fasilə seçimi yoxdur; gecəni keçən qeydləri qəbul edir.
 3. Standart 2x, seçilə bilən 2x və 3x əmsalla hər qeydin məbləğini hesablayır.
 4. Qeydləri brauzerdə avtomatik saxlayır; redaktə, kopyalama, silmə, ay/mətn/layihə/əmsal filtrləri var.
@@ -17,7 +17,7 @@ Bu versiyada giriş, ortaq hesab, rəhbər paneli, təsdiq və ödəniş statusu
 
 | Bölmə         | İstifadəçinin daxil etdiyi                                                 | Avtomatik hesablanan           |
 | ------------- | -------------------------------------------------------------------------- | ------------------------------ |
-| Aylıq maaş    | Ay/il, brutto tarif maaşı (AZN)                                            | Saatlıq tarif                  |
+| Aylıq maaş    | Ay/il, net maaş (AZN)                                                      | Saatlıq tarif                  |
 | Əsas qeyd     | Tarix, başlanma saatı, bitmə saatı, əmsal (1x/2x/3x), istəyə görə mövzu    | İl, ay, faktiki müddət, məbləğ |
 | Əlavə məlumat | Əməkdaş, şöbə müdiri, müştəri, layihə, icra günü statusu, iş mühiti, səbəb | —                              |
 
@@ -26,7 +26,7 @@ Bu versiyada giriş, ortaq hesab, rəhbər paneli, təsdiq və ödəniş statusu
 ## Hesablama
 
 ```text
-Saatlıq tarif = brutto tarif maaşı / ayın norma iş saatı
+Saatlıq tarif = net maaş / ayın norma iş saatı
 Məbləğ = iş dəqiqəsi / 60 × saatlıq tarif × əmsal
 ```
 
@@ -67,8 +67,8 @@ Use three simple top tabs: “Qeydlərim”, “Analiz”, and “Fayllar”.
 2. New-record form: date, start time, end time, multiplier segmented control
    (1x, 2x default, 3x), optional subject. There is no break field.
    Display calculated duration and amount immediately. Show employee, manager, customer, project, day type, work environment, and reason in the same form, always expanded. Provide clear “Qeydi saxla” and “Ləğv et” buttons.
-3. Monthly salary settings: month/year, monthly gross tariff salary in AZN, a read-only official monthly norm from the Azerbaijan Ministry of Labour production calendar, and a read-only hourly rate. The user cannot enter the monthly hours.
-   Amount = worked hours × (gross tariff salary / monthly normal hours)
+3. Monthly salary settings: month/year, monthly net salary in AZN, a read-only official monthly norm from the Azerbaijan Ministry of Labour production calendar, and a read-only hourly rate. The user cannot enter the monthly hours.
+   Amount = worked hours × (net salary / monthly normal hours)
    × multiplier. Two actual hours at 3x remain two hours in time summaries.
 4. Analiz: monthly hours/amount, a monthly trend, and project breakdown.
    Put customer, reason, environment, weekday, multiplier, and previous-month
@@ -95,4 +95,4 @@ Vizual ekranlar üçün Google Stitch, işlək Next.js/React interfeysi üçün 
 
 İlk yüklənmiş Stitch ZIP dizaynı əsasdır: mərkəzdə menyu, açıq bənövşəyi fon, ağ kartlar, yaşıl vurğu; açıq/tünd rejim. Dizayndakı fasilə sütunu və 1.5x nümunələri tətbiq edilmir: istifadəçinin tələbi 1x/2x/3x və fasiləsiz yeni qeyddir.
 
-Hesablama yeniləməsi: gecəni keçən qeyd günlərə bölünür, hər gün öz ayının maaşı və rəsmi normasından istifadə edir. 22:00–06:00 gecə saatlarıdır; gecə faizi ayrıca saatlıq tarifə tətbiq olunur və əmsala vurulmur. Formada hər günün əsas məbləği, gecə əlavəsi və yekunu göstərilir. Əvvəlki net maaş avtomatik brutto kimi dəyişdirilmir.
+Hesablama yeniləməsi: gecəni keçən qeyd günlərə bölünür, hər gün öz ayının maaşı və rəsmi normasından istifadə edir. Gecə əlavəsi yoxdur. Formada hər günün müddəti, net maaşa uyğun tarifi və məbləği göstərilir. Əvvəlki net maaşlar qorunur. Brutto kimi saxlanmış ay üçün istifadəçi net maaşını daxil edir; avtomatik vergi çevirməsi aparılmır.

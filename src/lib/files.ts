@@ -3,8 +3,6 @@ import { getWorkNorm, WORK_SCHEDULE } from "./work-calendar";
 import {
   amount,
   dailyEntries,
-  nightMinutes,
-  calculationParts,
   roundMoney,
   AppData,
   durationMinutes,
@@ -40,10 +38,6 @@ export const EXCEL_HEADERS = [
   "Əmsal",
   "Saatlıq tarif (AZN)",
   "Məbləğ (AZN)",
-  "Gecə müddəti (saat:dəqiqə)",
-  "Gecə əlavəsi (%)",
-  "Gecə əlavəsi (AZN)",
-  "Əsas məbləğ (AZN)",
 ];
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 type Cell = unknown;
@@ -179,7 +173,7 @@ export async function createWorkbook(
   reportTitle(summary, 8, "ARTISAAT · AYLIQ HESABAT", period, owner);
   summary.mergeCells("A5:H5");
   summary.getCell("A5").value =
-    "Tarif = ayın maaşı ÷ rəsmi norma · məbləğə ayrıca gecə əlavəsi daxildir · " +
+    "Tarif = ayın net maaşı ÷ rəsmi norma · məbləğ = saat × tarif × əmsal · " +
     WORK_SCHEDULE;
   summary.getCell("A5").font = {
     name: "Calibri",
@@ -189,7 +183,7 @@ export async function createWorkbook(
   summary.getRow(5).height = 25;
   summary.getRow(6).values = [
     "Ay",
-    "Aylıq maaş (AZN)",
+    "Net maaş (AZN)",
     "Norma (saat)",
     "Saatlıq tarif (AZN)",
     "Overtime (saat:dəqiqə)",
@@ -206,8 +200,10 @@ export async function createWorkbook(
   for (const [month, rows] of groups) {
     const norm = getWorkNorm(month);
     const row = summary.addRow([
-      `${monthLabel(month)}\n${data.months[month]?.basis === "gross" ? "Brutto tarif" : "Əvvəlki net / idxal"}`,
-      data.months[month]?.salary ?? null,
+      `${monthLabel(month)}\n${data.months[month]?.basis === "gross" ? "Net maaş tələb olunur" : "Net maaş / idxal"}`,
+      data.months[month]?.basis === "gross"
+        ? null
+        : (data.months[month]?.salary ?? null),
       norm?.hours ?? null,
       hourlyRate(data.months[month], month),
       rows.reduce((sum, e) => sum + durationMinutes(e), 0) / 1440,
@@ -240,7 +236,7 @@ export async function createWorkbook(
   let noteRow = summaryTotal.number + 2;
   summary.mergeCells(noteRow, 1, noteRow, 8);
   summary.getCell(noteRow, 1).value =
-    "Tarifsiz hissələr məbləğə daxil deyil. Hər gün öz ayının tarifi ilə hesablanır. Gecə əlavəsi = gecə saatı × tarif × faiz. Əvvəlki net maaşı brutto tariflə yenilə.";
+    "Tarifsiz hissələr məbləğə daxil deyil. Hər gün öz ayının tarifi ilə hesablanır. Hesablama daxil edilmiş net maaş əsasında aparılır.";
   summary.getCell(noteRow, 1).font = {
     name: "Calibri",
     size: 10,
@@ -283,13 +279,12 @@ export async function createWorkbook(
       },
     ],
   });
-  [
-    7, 12, 24, 24, 13, 20, 14, 11, 11, 23, 20, 20, 45, 23, 10, 20, 21, 17, 14,
-    18, 18,
-  ].forEach((width, index) => {
-    sheet.getColumn(index + 1).width = width;
-  });
-  reportTitle(sheet, 21, "ARTISAAT · ƏLAVƏ İŞ QEYDLƏRİ", period, owner);
+  [7, 12, 24, 24, 13, 20, 14, 11, 11, 23, 20, 20, 45, 23, 10, 20, 21].forEach(
+    (width, index) => {
+      sheet.getColumn(index + 1).width = width;
+    },
+  );
+  reportTitle(sheet, 17, "ARTISAAT · ƏLAVƏ İŞ QEYDLƏRİ", period, owner);
   for (const [from, to, label] of [
     [1, 2, "DÖVR"],
     [3, 4, "ƏMƏKDAŞ"],
@@ -297,7 +292,6 @@ export async function createWorkbook(
     [7, 12, "İŞ VAXTI"],
     [13, 14, "TAPŞIRIQ"],
     [15, 17, "HESABLAMA"],
-    [18, 21, "GECƏ ƏLAVƏSİ"],
   ] as const) {
     sheet.mergeCells(5, from, 5, to);
     const cell = sheet.getCell(5, from);
@@ -338,14 +332,6 @@ export async function createWorkbook(
       entry.multiplier,
       entryRate(entry, data.months),
       amount(entry, data.months),
-      nightMinutes(entry) / 1440,
-      entry.nightPercent ?? 0,
-      calculationParts(entry, data.months)[0]?.supplement === null
-        ? null
-        : roundMoney(calculationParts(entry, data.months)[0]?.supplement ?? 0),
-      calculationParts(entry, data.months)[0]?.base === null
-        ? null
-        : roundMoney(calculationParts(entry, data.months)[0]?.base ?? 0),
     ]);
     styleDataRow(row, row.number % 2 === 1);
     const lines = Math.max(
@@ -367,7 +353,7 @@ export async function createWorkbook(
         wrapText: true,
       };
     });
-    [16, 17, 20, 21].forEach((index) => {
+    [16, 17].forEach((index) => {
       row.getCell(index).alignment = {
         horizontal: "right",
         vertical: "middle",
@@ -379,14 +365,12 @@ export async function createWorkbook(
     sheet.getColumn(index).numFmt = "hh:mm";
   });
   sheet.getColumn(12).numFmt = "[h]:mm";
-  sheet.getColumn(18).numFmt = "[h]:mm";
-  sheet.getColumn(19).numFmt = '0.##"%"';
   sheet.getColumn(15).numFmt = '0"x"';
-  [16, 17, 20, 21].forEach((index) => {
+  [16, 17].forEach((index) => {
     sheet.getColumn(index).numFmt = "#,##0.00";
   });
   const end = sheet.rowCount;
-  sheet.autoFilter = `A6:U${end}`;
+  sheet.autoFilter = `A6:Q${end}`;
   const total = sheet.getRow(end + 1);
   // Leave G:I empty so the total cannot be mistaken for an imported work record.
   sheet.mergeCells(total.number, 1, total.number, 6);
@@ -397,35 +381,8 @@ export async function createWorkbook(
   sheet.mergeCells(total.number, 13, total.number, 16);
   total.getCell(13).value = "Ümumi məbləğ (AZN)";
   setSum(total.getCell(17), "Q", end, totalMoney);
-  setSum(
-    total.getCell(18),
-    "R",
-    end,
-    entries.reduce((sum, entry) => sum + nightMinutes(entry), 0) / 1440,
-  );
-  setSum(
-    total.getCell(20),
-    "T",
-    end,
-    entries.reduce(
-      (sum, entry) =>
-        sum +
-        roundMoney(calculationParts(entry, data.months)[0]?.supplement ?? 0),
-      0,
-    ),
-  );
-  setSum(
-    total.getCell(21),
-    "U",
-    end,
-    entries.reduce(
-      (sum, entry) =>
-        sum + roundMoney(calculationParts(entry, data.months)[0]?.base ?? 0),
-      0,
-    ),
-  );
   styleTotal(total);
-  configurePrint(sheet, 21, total.number, true);
+  configurePrint(sheet, 17, total.number, true);
   return new Uint8Array(await workbook.xlsx.writeBuffer());
 }
 function reportTitle(
@@ -563,6 +520,21 @@ function configurePrint(
   };
   sheet.headerFooter = { oddFooter: "&LArtıSaat&CƏlavə iş hesabatı&R&P / &N" };
 }
+// Used only to recover the base tariff when importing older Excel reports.
+function legacyNightMinutes(entry: Entry): number {
+  return dailyEntries([entry]).reduce((sum, part) => {
+    const start = timeMinutes(part.start);
+    const end = part.end === "00:00" ? 1440 : timeMinutes(part.end, true);
+    const night =
+      Math.max(0, Math.min(end, 360) - start) +
+      Math.max(0, end - Math.max(start, 1320));
+    // Historical breaks have no timestamps; only their proportional estimate is known.
+    const netNight = part.breakMinutes
+      ? Math.round((night * durationMinutes(part)) / (end - start))
+      : night;
+    return sum + netNight;
+  }, 0);
+}
 export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
   if (buffer.byteLength > MAX_FILE_SIZE)
     throw new Error("Fayl ən çox 10 MB ola bilər.");
@@ -627,7 +599,9 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
           numeric(get("Gecə əlavəsi (%)"), "Gecə faizi") ?? 0;
         if (nightPercent < 0 || nightPercent > 1000)
           throw new Error("Gecə əlavəsi 0–1000% aralığında olmalıdır.");
-        const night = nightMinutes({
+        // Legacy reports may include a night premium. Recover their base tariff
+        // for the current overtime-only calculation instead of carrying the premium forward.
+        const night = legacyNightMinutes({
           date,
           start,
           end,
@@ -669,7 +643,6 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
           subject: str(get("Mövzu")),
           reason: str(get("Səbəb")),
           rate,
-          ...(nightPercent ? { nightPercent } : {}),
         };
         result.entries.push(entry);
       } catch (error) {

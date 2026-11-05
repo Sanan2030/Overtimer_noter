@@ -34,7 +34,6 @@ import {
   displayDate,
   durationMinutes,
   dailyEntries,
-  nightMinutes,
   emptyData,
   Entry,
   entryRate,
@@ -555,8 +554,8 @@ export default function OvertimeApp() {
                           {" "}
                           / {getWorkNorm(month)?.hours ?? "—"} s ·{" "}
                           {data.months[month].basis === "gross"
-                            ? "brutto"
-                            : "əvvəlki net"}
+                            ? "əvvəlki brutto"
+                            : "net"}
                         </small>
                       </>
                     ) : (
@@ -583,17 +582,16 @@ export default function OvertimeApp() {
             <Stats entries={selectedEntries} data={data} compact />
             {!data.months[month] && period !== "all" && (
               <p className="setup-note">
-                “Aylıq maaş” bölməsində brutto tarif maaşını daxil et. Rəsmi
-                norma saatı avtomatik seçilir.
+                “Aylıq maaş” bölməsində net maaşını daxil et. Rəsmi norma saatı
+                avtomatik seçilir.
               </p>
             )}
             {data.months[month] &&
-              data.months[month].basis !== "gross" &&
+              data.months[month].basis === "gross" &&
               period !== "all" && (
                 <p className="setup-note">
-                  Bu ayın hesablamasında əvvəlki net maaş istifadə olunur.
-                  Qanuni məbləğ üçün “Aylıq maaş” bölməsində brutto tarif
-                  maaşını daxil et.
+                  Bu ay üçün əvvəlki brutto maaş saxlanıb. Hesablamanı davam
+                  etdirmək üçün “Aylıq maaş” bölməsində net maaşını daxil et.
                 </p>
               )}
             <section
@@ -732,11 +730,7 @@ export default function OvertimeApp() {
                               <strong>
                                 {formatDuration(durationMinutes(entry))}
                               </strong>
-                              <small>
-                                {nightMinutes(entry)
-                                  ? `${formatDuration(nightMinutes(entry))} gecə`
-                                  : "saat : dəqiqə"}
-                              </small>
+                              <small>saat : dəqiqə</small>
                             </td>
                             <td>
                               <span className={`pill pill-${entry.multiplier}`}>
@@ -753,9 +747,6 @@ export default function OvertimeApp() {
                                 {entryRate(entry, data.months) === null
                                   ? "Tarif yoxdur"
                                   : `${money(entryRate(entry, data.months)!)} ₼ / saat`}
-                                {(entry.nightPercent ?? 0) > 0 &&
-                                  nightMinutes(entry) > 0 &&
-                                  ` + ${entry.nightPercent}% gecə`}
                               </small>
                             </td>
                             <td>
@@ -1077,7 +1068,7 @@ export default function OvertimeApp() {
               ...old,
               months: {
                 ...old.months,
-                [key]: { salary, hours, basis: "gross" },
+                [key]: { salary, hours, basis: "net" },
               },
               entries: old.entries.map((e) =>
                 e.date.startsWith(key) ? { ...e, rate: salary / hours } : e,
@@ -1172,20 +1163,19 @@ export default function OvertimeApp() {
               <span>01</span>
               <h3>Aylıq maaşını daxil et</h3>
               <p>
-                Saatlıq tarif = aylıq brutto tarif maaşı ÷ həmin ay üçün
-                ƏƏSMN-nin rəsmi norma saatı. Yalnız maaşını daxil edirsən.
+                Saatlıq tarif = aylıq net maaş ÷ həmin ay üçün ƏƏSMN-nin rəsmi
+                norma saatı. Yalnız maaşını daxil edirsən.
               </p>
             </div>
             <div>
               <span>02</span>
               <h3>Vaxtını və əmsalı seç</h3>
               <p>
-                Məbləğ = faktiki saat × həmin ayın tarifi × seçilən əmsal + gecə
-                əlavəsi. Yeni qeyddə 2x seçilir; əmsalı işin növünə uyğun dəyişə
-                bilərsən. 22:00–06:00 gecə saatlarıdır. Ay dəyişəndə hər hissə
-                öz ayının maaşı və norması ilə hesablanır. Norma
-                daxilində/üstündə olması normal iş qrafiki bilinmədən avtomatik
-                müəyyən edilmir.
+                Məbləğ = faktiki saat × həmin ayın net maaşına uyğun tarif ×
+                seçilən əmsal. Yeni qeyddə 2x seçilir; əmsalı işin növünə uyğun
+                dəyişə bilərsən. Ay dəyişəndə hər hissə öz ayının maaşı və
+                norması ilə hesablanır. Norma daxilində/üstündə olması normal iş
+                qrafiki bilinmədən avtomatik müəyyən edilmir.
               </p>
             </div>
             <div>
@@ -1203,16 +1193,13 @@ export default function OvertimeApp() {
               <p>
                 Excel ixracında ilk 14 sütun şirkət cədvəlinə uyğundur; əlavə
                 sütunlarda əmsal, tarif və məbləğ görünür. Aylıq yekun ayrıca
-                vərəqdədir. Gecə saatları, əlavə faizi və gecə məbləği ayrıca
-                göstərilir. Gecə əlavəsi saatlıq tarifə tətbiq olunur, overtime
-                əmsalına vurulmur. Əvvəlki qeydlər gecə əlavəsiz saxlanır;
-                istəsən redaktə edə bilərsən.
+                vərəqdədir. Hesabat daxil etdiyin net maaş əsasında hazırlanır.
                 <a
                   href="https://e-qanun.az/framework/46943"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Əmək Məcəlləsi: 97, 164–166 ↗
+                  Əmək Məcəlləsi: 164–165 ↗
                 </a>
               </p>
             </div>
@@ -1259,8 +1246,8 @@ function SalaryForm({
   const [salary, setSalary] = useState(
     String(
       data.months[initialMonth]?.basis === "gross"
-        ? data.months[initialMonth].salary
-        : "",
+        ? ""
+        : (data.months[initialMonth]?.salary ?? ""),
     ),
   );
   const norm = getWorkNorm(month);
@@ -1270,7 +1257,7 @@ function SalaryForm({
   return (
     <Modal
       title="Aylıq maaş ayarları"
-      subtitle="Brutto tarif (vəzifə) maaşını daxil et. Norma saatı rəsmi təqvimdən seçilir."
+      subtitle="Net maaşını daxil et. Norma saatı rəsmi təqvimdən seçilir."
       close={close}
     >
       <form
@@ -1286,7 +1273,7 @@ function SalaryForm({
             Number(hours) > 744
           ) {
             setError(
-              "Ayı və brutto tarif maaşını düzgün daxil et; norma avtomatik seçilir.",
+              "Ayı və net maaşını düzgün daxil et; norma avtomatik seçilir.",
             );
             return;
           }
@@ -1307,22 +1294,21 @@ function SalaryForm({
                 setSalary(
                   String(
                     data.months[key]?.basis === "gross"
-                      ? data.months[key].salary
-                      : "",
+                      ? ""
+                      : (data.months[key]?.salary ?? ""),
                   ),
                 );
               }}
             />
           </Field>
-          {data.months[month] && data.months[month].basis !== "gross" && (
+          {data.months[month] && data.months[month].basis === "gross" && (
             <p className="inline-info">
-              Əvvəlki net maaş: {money(data.months[month].salary)} ₼. Bu dəyər
-              dəyişdirilməyib. Qanuni hesablama üçün brutto tarif maaşını ayrıca
-              daxil et.
+              Əvvəlki brutto maaş: {money(data.months[month].salary)} ₼. Net
+              maaşını daxil et; overtime bu məbləğə görə hesablanacaq.
             </p>
           )}
           <div className="form-grid two">
-            <Field label="Tarif maaşı — brutto (AZN)">
+            <Field label="Net maaş (AZN)">
               <input
                 type="number"
                 required

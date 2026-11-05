@@ -13,7 +13,6 @@ import {
   AppData,
   durationMinutes,
   dailyEntries,
-  nightMinutes,
   Entry,
   formatDuration,
   money,
@@ -53,13 +52,7 @@ export function Stats({
             .replace(".", ",")}{" "}
           <small>saat</small>
         </div>
-        <p>
-          Faktiki işlənmiş vaxt ·{" "}
-          {formatDuration(
-            entries.reduce((sum, entry) => sum + nightMinutes(entry), 0),
-          )}{" "}
-          gecə
-        </p>
+        <p>Faktiki işlənmiş vaxt</p>
       </div>
       <div className="stat-card">
         <div className="stat-label">
@@ -74,7 +67,7 @@ export function Stats({
         <p>
           {unpriced
             ? `${unpriced} qeyd üçün tarif daxil edilməyib`
-            : "Əmsal və gecə əlavəsi daxil"}
+            : "Seçilən əmsal nəzərə alınmaqla"}
         </p>
       </div>
       {!compact && (

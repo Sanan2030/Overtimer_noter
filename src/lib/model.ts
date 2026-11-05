@@ -44,7 +44,7 @@ export type Entry = {
   subject: string;
   reason: string;
   rate: number | null;
-  // Missing on historical records: retain their original zero night supplement.
+  // Historical backup metadata only; never included in current calculations.
   nightPercent?: number;
   rates?: Record<string, number>;
   // A derived daily row; never written into the JSON source records.
@@ -117,6 +117,7 @@ export function hourlyRate(
   config?: MonthConfig,
   month?: string,
 ): number | null {
+  if (config?.basis === "gross") return null;
   const hours = month ? getWorkNorm(month)?.hours : config?.hours;
   return config && hours && hours > 0 ? config.salary / hours : null;
 }
@@ -125,12 +126,14 @@ export function entryRate(
   months: AppData["months"],
 ): number | null {
   const month = entry.date.slice(0, 7);
+  // A previously saved gross salary must be replaced with a net salary before
+  // using either the monthly divisor or any saved tariff for this month.
+  if (months[month]?.basis === "gross") return null;
   // A saved monthly salary always uses that exact month's official divisor.
   // Explicit amounts from imported files remain usable when no salary is known.
   return hourlyRate(months[month], month) ?? entry.rates?.[month] ?? entry.rate;
 }
 export const LABOUR_CODE_URL = "https://e-qanun.az/framework/46943";
-export const DEFAULT_NIGHT_PERCENT = 20;
 export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -180,47 +183,22 @@ export function dailyEntries(
     );
   });
 }
-export function nightMinutes(entry: Entry): number {
-  return dailyEntries([entry]).reduce((sum, part) => {
-    const start = timeMinutes(part.start);
-    const end = part.end === "00:00" ? 1440 : timeMinutes(part.end, true);
-    const night =
-      Math.max(0, Math.min(end, 360) - start) +
-      Math.max(0, end - Math.max(start, 1320));
-    // Historical breaks have no timestamps; only their proportional estimate is known.
-    const netNight = part.breakMinutes
-      ? Math.round((night * durationMinutes(part)) / (end - start))
-      : night;
-    return sum + netNight;
-  }, 0);
-}
 export function calculationParts(entry: Entry, months: AppData["months"]) {
   return dailyEntries([entry], months).map((part) => {
     const rate = entryRate(part, months);
     const minutes = durationMinutes(part);
-    const night = nightMinutes(part);
     const base =
       rate === null
         ? null
         : roundMoney((minutes / 60) * rate * part.multiplier);
-    // Night premium is an addition to the tariff, not a multiplier on overtime pay.
-    const supplement =
-      rate === null
-        ? null
-        : roundMoney(((night / 60) * rate * (part.nightPercent ?? 0)) / 100);
     return {
       entry: part,
       month: part.date.slice(0, 7),
       minutes,
-      nightMinutes: night,
       norm: getWorkNorm(part.date.slice(0, 7))?.hours ?? null,
       rate,
       base,
-      supplement,
-      total:
-        base === null || supplement === null
-          ? null
-          : roundMoney(base + supplement),
+      total: base,
     };
   });
 }
@@ -257,7 +235,6 @@ export function newEntry(profile: Profile, date = localDate()): Entry {
     end: "20:00",
     breakMinutes: 0,
     multiplier: 2,
-    nightPercent: DEFAULT_NIGHT_PERCENT,
     ...profile,
     dayStatus: "qeyri-iş saatı",
     subject: "",
@@ -298,7 +275,6 @@ export function fingerprint(entry: Entry): string {
   const normalized = {
     ...rest,
     end: rest.end === "00:00" ? "24:00" : rest.end,
-    nightPercent: nightPercent ?? 0,
   };
   return JSON.stringify(
     Object.entries(normalized).sort(([a], [b]) => a.localeCompare(b)),
@@ -357,10 +333,6 @@ export function validateEntry(value: unknown): Entry {
     )
       throw new Error("Gecə əlavəsi 0–1000% aralığında olmalıdır.");
     result.nightPercent = row.nightPercent;
-    if (result.nightPercent > 0 && result.breakMinutes > 0)
-      throw new Error(
-        "Gecə əlavəsi üçün fasiləli qeydi faktiki işlənmiş ayrı vaxt aralıqları ilə daxil et.",
-      );
   }
   if (row.rates !== undefined) {
     result.rates = {};
