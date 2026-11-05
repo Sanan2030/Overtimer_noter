@@ -4,6 +4,9 @@ import { useState } from "react";
 import { ArrowRight, Clock3, Info, Save } from "lucide-react";
 import {
   amount,
+  calculationParts,
+  monthLabel,
+  LABOUR_CODE_URL,
   AppData,
   displayDate,
   durationMinutes,
@@ -31,7 +34,11 @@ export function EntryForm({
   close: () => void;
   save: (entry: Entry, remember: boolean) => boolean;
 }) {
-  const [entry, setEntry] = useState({ ...initial, breakMinutes: 0 });
+  const [entry, setEntry] = useState({
+    ...initial,
+    end: initial.end === "24:00" ? "00:00" : initial.end,
+    breakMinutes: 0,
+  });
   const [remember, setRemember] = useState(true);
   const [ackOverlap, setAckOverlap] = useState(false);
   const [error, setError] = useState("");
@@ -43,6 +50,7 @@ export function EntryForm({
   let minutes = 0;
   let calculationError = "";
   try {
+    if (!isDate(entry.date)) throw new Error("Düzgün tarix seç.");
     minutes = durationMinutes(entry);
   } catch (err) {
     calculationError = (err as Error).message;
@@ -50,6 +58,7 @@ export function EntryForm({
   const rate = entryRate(entry, data.months);
   const norm = getWorkNorm(entry.date.slice(0, 7));
   const total = calculationError ? null : amount(entry, data.months);
+  const parts = calculationError ? [] : calculationParts(entry, data.months);
   const hasOverlap =
     isDate(entry.date) && !calculationError && overlaps(entry, data.entries);
   const overnight = entry.end < entry.start;
@@ -115,8 +124,9 @@ export function EntryForm({
           </div>
           {overnight && (
             <p className="inline-info">
-              <Info size={15} /> Bitmə saatı növbəti günə aiddir. Qeyd başlanma
-              tarixinin ayına hesablanır.
+              <Info size={15} /> Bitmə saatı növbəti günə aiddir. Başlanma və
+              bitmə günləri ayrıca hesablanır; hər hissə öz ayının maaş və
+              normasından istifadə edir.
             </p>
           )}
           <div className="form-grid two align-end">
@@ -136,7 +146,7 @@ export function EntryForm({
                     }
                     onClick={() => update("multiplier", multiplier)}
                   >
-                    {multiplier}x {multiplier === 1 && <span>standart</span>}
+                    {multiplier}x
                   </button>
                 ))}
               </div>
@@ -151,6 +161,31 @@ export function EntryForm({
               )}
             </div>
           </div>
+          <Field label="Gecə əlavəsi (%)">
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              step="0.01"
+              value={entry.nightPercent ?? 0}
+              onChange={(event) =>
+                update("nightPercent", Number(event.target.value))
+              }
+            />
+            <small className="muted">
+              22:00–06:00 · adi gecə işi üçün 20%; çoxnövbəli rejimdə gecə
+              növbəsi üçün 40%. Müqaviləndəki uyğun faizi daxil et. Əlavə
+              saatlıq tarifə hesablanır.
+            </small>
+          </Field>
+          <p className="muted small-copy">
+            2x normadan artıq iş üçündür. İstirahət/bayram günü aylıq norma
+            daxilində iş üçün 1x maaşdan əlavə ödənişdir. Tətbiq normal iş
+            saatlarını uçota almadığı üçün bu fərqi özü müəyyən etmir.{" "}
+            <a href={LABOUR_CODE_URL} target="_blank" rel="noreferrer">
+              Maddə 164–166 ↗
+            </a>
+          </p>
           <div className="calculation">
             <div>
               <span>
@@ -166,24 +201,62 @@ export function EntryForm({
               <span>
                 {rate === null
                   ? "Tarif təyin edilməyib"
-                  : `${money(rate)} ₼ / saat × ${entry.multiplier}`}
+                  : parts.length > 1
+                    ? "Hər günün tarifi ilə · bölgü aşağıdadır"
+                    : `${money(rate)} ₼ / saat × ${entry.multiplier} + gecə`}
               </span>
               <strong>
                 {total === null ? "—" : money(total)} <small>AZN</small>
               </strong>
             </div>
           </div>
+          {parts.length > 0 && (
+            <div className="pay-breakdown" aria-label="Aylar üzrə hesablama">
+              {parts.map((part) => (
+                <div className="pay-breakdown-row" key={part.entry.date}>
+                  <div>
+                    <strong>
+                      {displayDate(part.entry.date)} · {part.entry.start}–
+                      {part.entry.end}
+                    </strong>
+                    <small>
+                      {monthLabel(part.month)} · norma: {part.norm ?? "—"} saat
+                      · gecə: {formatDuration(part.nightMinutes)}
+                    </small>
+                  </div>
+                  <div>
+                    <strong>
+                      {part.total === null
+                        ? "Tarif yoxdur"
+                        : `${money(part.total)} ₼`}
+                    </strong>
+                    <small>
+                      {part.base === null
+                        ? "Bu ayın maaşını daxil et"
+                        : `${money(part.base)} ₼ əsas + ${money(part.supplement!)} ₼ gecə`}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {calculationError && (
             <p className="form-error" role="alert">
               {calculationError}
             </p>
           )}
-          {rate === null && (
+          {total === null && !calculationError && (
             <p className="inline-info">
               <Info size={16} /> Məbləği hesablamaq üçün{" "}
-              {displayDate(`${entry.date.slice(0, 7)}-01`).slice(3)} ayının
-              maaşını daxil et. Norma saatı avtomatik seçilir. Qeydi tarifsiz də
-              saxlamaq olar.
+              {[
+                ...new Set(
+                  parts
+                    .filter((part) => part.rate === null)
+                    .map((part) => monthLabel(part.month)),
+                ),
+              ].join(", ")}{" "}
+              ayı üçün maaşı daxil et. Norma saatı avtomatik seçilir. Qeydi
+              tarifsiz də saxlamaq olar.
             </p>
           )}
           <Field label="Mövzu">

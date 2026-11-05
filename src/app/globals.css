@@ -2643,3 +2643,45 @@ body {
     width: 18px;
   }
 }
+
+.pay-breakdown {
+  margin: 0 0 20px;
+  padding: 4px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.pay-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.pay-breakdown-row:last-child {
+  border-bottom: 0;
+}
+.pay-breakdown-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.pay-breakdown-row > div:last-child {
+  text-align: right;
+}
+@media (max-width: 560px) {
+  .form-grid.three {
+    grid-template-columns: 1fr 1fr;
+  }
+  .form-grid.three > .field:first-child {
+    grid-column: 1 / -1;
+  }
+  .pay-breakdown-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pay-breakdown-row > div:last-child {
+    text-align: left;
+  }
+}

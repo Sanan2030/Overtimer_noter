@@ -77,6 +77,7 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
     start: "22:00",
     end: "02:00",
     breakMinutes: 30,
+    nightPercent: 0,
     multiplier: 3 as const,
     subject: '=HYPERLINK("https://example.org")',
   };
@@ -87,11 +88,20 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
   };
   const buffer = await createWorkbook(data);
   const imported = await parseWorkbook(Uint8Array.from(buffer).buffer);
-  assert.equal(imported.entries.length, 1);
-  assert.equal(durationMinutes(imported.entries[0]), 210);
-  assert.equal(imported.entries[0].breakMinutes, 30);
+  assert.equal(imported.entries.length, 2);
+  assert.equal(
+    imported.entries.reduce((sum, row) => sum + durationMinutes(row), 0),
+    210,
+  );
+  assert.equal(
+    imported.entries.reduce((sum, row) => sum + row.breakMinutes, 0),
+    30,
+  );
   assert.equal(imported.entries[0].subject, row.subject);
-  assert.equal(amount(imported.entries[0], {}), 78.75);
+  assert.equal(
+    imported.entries.reduce((sum, row) => sum + amount(row, {})!, 0),
+    78.76,
+  );
   assert.equal(mergeData(data, imported).added, 0);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer.buffer as ArrayBuffer);
@@ -103,7 +113,7 @@ test("XLSX round trip preserves overnight, breaks, numeric times, amount and exa
   assert.equal(sheet.getCell("M7").type, ExcelJS.ValueType.String);
   assert.equal(
     workbook.getWorksheet("Aylıq yekun")!.getCell("G7").value,
-    78.75,
+    78.76,
   );
 });
 test("invalid Excel rows reject the whole file with row diagnostics", async () => {
@@ -166,5 +176,46 @@ test("negative or inconsistent money columns are not silently changed", async ()
       await source([headers, ["02.10.2026", "18:00", "20:00", 7.5, 100]]),
     ),
     /uyğun deyil/,
+  );
+});
+
+test("month-boundary Excel includes separate norms, rates and additive night premiums and reimports without duplicates", async () => {
+  const row = {
+    ...newEntry(emptyProfile, "2026-10-31"),
+    start: "19:00",
+    end: "02:00",
+  };
+  const data = {
+    ...emptyData(),
+    months: {
+      "2026-10": { salary: 1320, hours: 176, basis: "gross" as const },
+      "2026-11": { salary: 1320, hours: 152, basis: "gross" as const },
+    },
+    entries: [row],
+  };
+  const bytes = await createWorkbook(data);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
+  const summary = workbook.getWorksheet("Aylıq yekun")!;
+  assert.equal(summary.getCell("C7").value, 176);
+  assert.equal(summary.getCell("C8").value, 152);
+  assert.equal(summary.getCell("G7").value, 78);
+  assert.equal(summary.getCell("G8").value, 38.21);
+  const details = workbook.getWorksheet("Overtime qeydləri")!;
+  assert.equal(details.getCell("I7").value, "24:00");
+  assert.equal(details.getCell("T7").value, 3);
+  assert.equal(details.getCell("T8").value, 3.47);
+  const imported = await parseWorkbook(Uint8Array.from(bytes).buffer);
+  assert.equal(imported.entries.length, 2);
+  assert.ok(
+    Math.abs(
+      imported.entries.reduce((sum, e) => sum + amount(e, {})!, 0) - 116.21,
+    ) < 1e-9,
+  );
+  assert.equal(mergeData(data, imported).added, 0);
+  assert.equal(mergeData(emptyData(), imported).added, 2);
+  assert.equal(
+    mergeData(mergeData(emptyData(), imported).data, imported).added,
+    0,
   );
 });

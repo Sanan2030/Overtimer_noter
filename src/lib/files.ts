@@ -2,6 +2,10 @@ import type { Worksheet, Row } from "exceljs";
 import { getWorkNorm, WORK_SCHEDULE } from "./work-calendar";
 import {
   amount,
+  dailyEntries,
+  nightMinutes,
+  calculationParts,
+  roundMoney,
   AppData,
   durationMinutes,
   displayDate,
@@ -36,6 +40,10 @@ export const EXCEL_HEADERS = [
   "Əmsal",
   "Saatlıq tarif (AZN)",
   "Məbləğ (AZN)",
+  "Gecə müddəti (saat:dəqiqə)",
+  "Gecə əlavəsi (%)",
+  "Gecə əlavəsi (AZN)",
+  "Əsas məbləğ (AZN)",
 ];
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 type Cell = unknown;
@@ -94,7 +102,7 @@ function excelDate(value: unknown, date1904: boolean): string {
     throw new Error("Tarix GG.AA.İİİİ və ya İİİİ-AA-GG formatında olmalıdır.");
   return date;
 }
-function excelTime(value: unknown): string {
+function excelTime(value: unknown, allowMidnight = false): string {
   const raw = cellValue(value);
   if (raw instanceof Date)
     return `${String(raw.getUTCHours()).padStart(2, "0")}:${String(raw.getUTCMinutes()).padStart(2, "0")}`;
@@ -103,7 +111,7 @@ function excelTime(value: unknown): string {
   const match = str(raw).match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (!match) throw new Error("Saat HH:MM formatında olmalıdır.");
   const result = `${match[1].padStart(2, "0")}:${match[2]}`;
-  timeMinutes(result);
+  timeMinutes(result, allowMidnight);
   return result;
 }
 function excelDuration(value: unknown): number | null {
@@ -136,6 +144,7 @@ export async function createWorkbook(
   workbook.subject = "Əlavə iş saatları və məbləğlər";
   workbook.created = new Date();
   workbook.calcProperties.fullCalcOnLoad = true;
+  entries = dailyEntries(entries, data.months);
   const sorted = [...entries].sort(
     (a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
   );
@@ -153,9 +162,8 @@ export async function createWorkbook(
     (sum, entry) => sum + durationMinutes(entry),
     0,
   );
-  const totalMoney = entries.reduce(
-    (sum, entry) => sum + (amount(entry, data.months) ?? 0),
-    0,
+  const totalMoney = roundMoney(
+    entries.reduce((sum, entry) => sum + (amount(entry, data.months) ?? 0), 0),
   );
 
   // The first sheet is a compact report. The second retains all 17 original columns.
@@ -171,7 +179,8 @@ export async function createWorkbook(
   reportTitle(summary, 8, "ARTISAAT · AYLIQ HESABAT", period, owner);
   summary.mergeCells("A5:H5");
   summary.getCell("A5").value =
-    "Saatlıq tarif = net maaş ÷ həmin ayın rəsmi norması · " + WORK_SCHEDULE;
+    "Tarif = ayın maaşı ÷ rəsmi norma · məbləğə ayrıca gecə əlavəsi daxildir · " +
+    WORK_SCHEDULE;
   summary.getCell("A5").font = {
     name: "Calibri",
     size: 10,
@@ -180,7 +189,7 @@ export async function createWorkbook(
   summary.getRow(5).height = 25;
   summary.getRow(6).values = [
     "Ay",
-    "Net maaş (AZN)",
+    "Aylıq maaş (AZN)",
     "Norma (saat)",
     "Saatlıq tarif (AZN)",
     "Overtime (saat:dəqiqə)",
@@ -197,7 +206,7 @@ export async function createWorkbook(
   for (const [month, rows] of groups) {
     const norm = getWorkNorm(month);
     const row = summary.addRow([
-      monthLabel(month),
+      `${monthLabel(month)}\n${data.months[month]?.basis === "gross" ? "Brutto tarif" : "Əvvəlki net / idxal"}`,
       data.months[month]?.salary ?? null,
       norm?.hours ?? null,
       hourlyRate(data.months[month], month),
@@ -231,7 +240,7 @@ export async function createWorkbook(
   let noteRow = summaryTotal.number + 2;
   summary.mergeCells(noteRow, 1, noteRow, 8);
   summary.getCell(noteRow, 1).value =
-    "Tarifsiz qeydlər saat yekununa daxildir; məbləğə daxil edilmir. Əmsal faktiki iş müddətini dəyişmir.";
+    "Tarifsiz hissələr məbləğə daxil deyil. Hər gün öz ayının tarifi ilə hesablanır. Gecə əlavəsi = gecə saatı × tarif × faiz. Əvvəlki net maaşı brutto tariflə yenilə.";
   summary.getCell(noteRow, 1).font = {
     name: "Calibri",
     size: 10,
@@ -274,12 +283,13 @@ export async function createWorkbook(
       },
     ],
   });
-  [7, 12, 24, 24, 13, 20, 14, 11, 11, 23, 20, 20, 50, 23, 10, 20, 21].forEach(
-    (width, index) => {
-      sheet.getColumn(index + 1).width = width;
-    },
-  );
-  reportTitle(sheet, 17, "ARTISAAT · ƏLAVƏ İŞ QEYDLƏRİ", period, owner);
+  [
+    7, 12, 24, 24, 13, 20, 14, 11, 11, 23, 20, 20, 45, 23, 10, 20, 21, 17, 14,
+    18, 18,
+  ].forEach((width, index) => {
+    sheet.getColumn(index + 1).width = width;
+  });
+  reportTitle(sheet, 21, "ARTISAAT · ƏLAVƏ İŞ QEYDLƏRİ", period, owner);
   for (const [from, to, label] of [
     [1, 2, "DÖVR"],
     [3, 4, "ƏMƏKDAŞ"],
@@ -287,6 +297,7 @@ export async function createWorkbook(
     [7, 12, "İŞ VAXTI"],
     [13, 14, "TAPŞIRIQ"],
     [15, 17, "HESABLAMA"],
+    [18, 21, "GECƏ ƏLAVƏSİ"],
   ] as const) {
     sheet.mergeCells(5, from, 5, to);
     const cell = sheet.getCell(5, from);
@@ -318,7 +329,7 @@ export async function createWorkbook(
       entry.project,
       new Date(`${entry.date}T00:00:00Z`),
       timeMinutes(entry.start) / 1440,
-      timeMinutes(entry.end) / 1440,
+      entry.end === "24:00" ? "24:00" : timeMinutes(entry.end) / 1440,
       entry.dayStatus,
       entry.environment,
       durationMinutes(entry) / 1440,
@@ -327,6 +338,14 @@ export async function createWorkbook(
       entry.multiplier,
       entryRate(entry, data.months),
       amount(entry, data.months),
+      nightMinutes(entry) / 1440,
+      entry.nightPercent ?? 0,
+      calculationParts(entry, data.months)[0]?.supplement === null
+        ? null
+        : roundMoney(calculationParts(entry, data.months)[0]?.supplement ?? 0),
+      calculationParts(entry, data.months)[0]?.base === null
+        ? null
+        : roundMoney(calculationParts(entry, data.months)[0]?.base ?? 0),
     ]);
     styleDataRow(row, row.number % 2 === 1);
     const lines = Math.max(
@@ -348,7 +367,7 @@ export async function createWorkbook(
         wrapText: true,
       };
     });
-    [16, 17].forEach((index) => {
+    [16, 17, 20, 21].forEach((index) => {
       row.getCell(index).alignment = {
         horizontal: "right",
         vertical: "middle",
@@ -360,12 +379,14 @@ export async function createWorkbook(
     sheet.getColumn(index).numFmt = "hh:mm";
   });
   sheet.getColumn(12).numFmt = "[h]:mm";
+  sheet.getColumn(18).numFmt = "[h]:mm";
+  sheet.getColumn(19).numFmt = '0.##"%"';
   sheet.getColumn(15).numFmt = '0"x"';
-  [16, 17].forEach((index) => {
+  [16, 17, 20, 21].forEach((index) => {
     sheet.getColumn(index).numFmt = "#,##0.00";
   });
   const end = sheet.rowCount;
-  sheet.autoFilter = `A6:Q${end}`;
+  sheet.autoFilter = `A6:U${end}`;
   const total = sheet.getRow(end + 1);
   // Leave G:I empty so the total cannot be mistaken for an imported work record.
   sheet.mergeCells(total.number, 1, total.number, 6);
@@ -376,8 +397,35 @@ export async function createWorkbook(
   sheet.mergeCells(total.number, 13, total.number, 16);
   total.getCell(13).value = "Ümumi məbləğ (AZN)";
   setSum(total.getCell(17), "Q", end, totalMoney);
+  setSum(
+    total.getCell(18),
+    "R",
+    end,
+    entries.reduce((sum, entry) => sum + nightMinutes(entry), 0) / 1440,
+  );
+  setSum(
+    total.getCell(20),
+    "T",
+    end,
+    entries.reduce(
+      (sum, entry) =>
+        sum +
+        roundMoney(calculationParts(entry, data.months)[0]?.supplement ?? 0),
+      0,
+    ),
+  );
+  setSum(
+    total.getCell(21),
+    "U",
+    end,
+    entries.reduce(
+      (sum, entry) =>
+        sum + roundMoney(calculationParts(entry, data.months)[0]?.base ?? 0),
+      0,
+    ),
+  );
   styleTotal(total);
-  configurePrint(sheet, 17, total.number, true);
+  configurePrint(sheet, 21, total.number, true);
   return new Uint8Array(await workbook.xlsx.writeBuffer());
 }
 function reportTitle(
@@ -559,7 +607,7 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
           Boolean(workbook.properties.date1904),
         );
         const start = excelTime(get("Başlanma")),
-          end = excelTime(get("Bitmə"));
+          end = excelTime(get("Bitmə"), true);
         const elapsed = durationMinutes({ start, end, breakMinutes: 0 });
         const reported = excelDuration(
           get("Müddət (saat: dəqiqə)") ?? get("Müddət"),
@@ -575,6 +623,16 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
         const total = numeric(get("Məbləğ (AZN)") ?? get("Məbləğ"), "Məbləğ");
         if ((rate !== null && rate < 0) || (total !== null && total < 0))
           throw new Error("Tarif və məbləğ mənfi ola bilməz.");
+        const nightPercent =
+          numeric(get("Gecə əlavəsi (%)"), "Gecə faizi") ?? 0;
+        if (nightPercent < 0 || nightPercent > 1000)
+          throw new Error("Gecə əlavəsi 0–1000% aralığında olmalıdır.");
+        const night = nightMinutes({
+          date,
+          start,
+          end,
+          breakMinutes: 0,
+        } as Entry);
         const duration = reported ?? elapsed;
         if (duration <= 0 || duration > elapsed)
           throw new Error("Müddət başlanma–bitmə aralığına uyğun deyil.");
@@ -582,12 +640,19 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
           rate !== null &&
           total !== null &&
           Math.abs(
-            Math.round((duration / 60) * rate * multiplier * 100) / 100 - total,
+            roundMoney(
+              rate *
+                ((duration / 60) * multiplier +
+                  ((night / 60) * nightPercent) / 100),
+            ) - total,
           ) > 0.011
         )
           throw new Error("Məbləğ, tarif və əmsal bir-birinə uyğun deyil.");
         if (rate === null && total !== null)
-          rate = total / ((duration / 60) * multiplier);
+          rate =
+            total /
+            ((duration / 60) * multiplier +
+              ((night / 60) * nightPercent) / 100);
         const entry: Entry = {
           id: crypto.randomUUID(),
           date,
@@ -604,6 +669,7 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<AppData> {
           subject: str(get("Mövzu")),
           reason: str(get("Səbəb")),
           rate,
+          ...(nightPercent ? { nightPercent } : {}),
         };
         result.entries.push(entry);
       } catch (error) {

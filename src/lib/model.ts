@@ -23,7 +23,11 @@ export type Profile = {
   project: string;
   environment: string;
 };
-export type MonthConfig = { salary: number; hours: number };
+export type MonthConfig = {
+  salary: number;
+  hours: number;
+  basis?: "net" | "gross";
+};
 export type Entry = {
   id: string;
   date: string;
@@ -40,6 +44,11 @@ export type Entry = {
   subject: string;
   reason: string;
   rate: number | null;
+  // Missing on historical records: retain their original zero night supplement.
+  nightPercent?: number;
+  rates?: Record<string, number>;
+  // A derived daily row; never written into the JSON source records.
+  sourceId?: string;
 };
 export type AppData = {
   version: 1;
@@ -78,7 +87,8 @@ export function isDate(value: string): boolean {
 export function isMonth(value: string): boolean {
   return isDate(`${value}-01`);
 }
-export function timeMinutes(time: string): number {
+export function timeMinutes(time: string, allowMidnight = false): number {
+  if (allowMidnight && time === "24:00") return 1440;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
     throw new Error("Saat HH:MM formatında olmalıdır.");
   const [h, m] = time.split(":").map(Number);
@@ -88,7 +98,7 @@ export function durationMinutes(
   entry: Pick<Entry, "start" | "end" | "breakMinutes">,
 ): number {
   const start = timeMinutes(entry.start),
-    end = timeMinutes(entry.end);
+    end = timeMinutes(entry.end, true);
   if (start === end)
     throw new Error("Başlanma və bitmə saatı eyni ola bilməz.");
   const elapsed = (end - start + 1440) % 1440;
@@ -117,17 +127,108 @@ export function entryRate(
   const month = entry.date.slice(0, 7);
   // A saved monthly salary always uses that exact month's official divisor.
   // Explicit amounts from imported files remain usable when no salary is known.
-  return hourlyRate(months[month], month) ?? entry.rate;
+  return hourlyRate(months[month], month) ?? entry.rates?.[month] ?? entry.rate;
+}
+export const LABOUR_CODE_URL = "https://e-qanun.az/framework/46943";
+export const DEFAULT_NIGHT_PERCENT = 20;
+export function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+/** Each calendar day uses its own month's tariff; 24:00 is end-of-day only. */
+export function dailyEntries(
+  entries: Entry[],
+  months?: AppData["months"],
+): Entry[] {
+  return entries.flatMap((entry) => {
+    if (entry.sourceId) return [entry];
+    const start = timeMinutes(entry.start);
+    const end = timeMinutes(entry.end, true);
+    if (end > start || end === 0) return [entry];
+    const elapsed = 1440 - start + end;
+    // Legacy breaks have no position. Allocate their minutes proportionally.
+    const firstBreak = Math.round(
+      (entry.breakMinutes * (1440 - start)) / elapsed,
+    );
+    const tomorrow = new Date(Date.parse(`${entry.date}T00:00:00Z`) + 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const make = (
+      date: string,
+      from: string,
+      to: string,
+      pause: number,
+    ): Entry => ({
+      ...entry,
+      id: `${entry.id}@${date}`,
+      sourceId: entry.id,
+      date,
+      start: from,
+      end: to,
+      breakMinutes: pause,
+      rate:
+        hourlyRate(months?.[date.slice(0, 7)], date.slice(0, 7)) ??
+        entry.rates?.[date.slice(0, 7)] ??
+        (date.slice(0, 7) === entry.date.slice(0, 7) ? entry.rate : null),
+    });
+    return [
+      make(entry.date, entry.start, "24:00", firstBreak),
+      make(tomorrow, "00:00", entry.end, entry.breakMinutes - firstBreak),
+    ].filter(
+      (part) =>
+        timeMinutes(part.end, true) - timeMinutes(part.start) >
+        part.breakMinutes,
+    );
+  });
+}
+export function nightMinutes(entry: Entry): number {
+  return dailyEntries([entry]).reduce((sum, part) => {
+    const start = timeMinutes(part.start);
+    const end = part.end === "00:00" ? 1440 : timeMinutes(part.end, true);
+    const night =
+      Math.max(0, Math.min(end, 360) - start) +
+      Math.max(0, end - Math.max(start, 1320));
+    // Historical breaks have no timestamps; only their proportional estimate is known.
+    const netNight = part.breakMinutes
+      ? Math.round((night * durationMinutes(part)) / (end - start))
+      : night;
+    return sum + netNight;
+  }, 0);
+}
+export function calculationParts(entry: Entry, months: AppData["months"]) {
+  return dailyEntries([entry], months).map((part) => {
+    const rate = entryRate(part, months);
+    const minutes = durationMinutes(part);
+    const night = nightMinutes(part);
+    const base =
+      rate === null
+        ? null
+        : roundMoney((minutes / 60) * rate * part.multiplier);
+    // Night premium is an addition to the tariff, not a multiplier on overtime pay.
+    const supplement =
+      rate === null
+        ? null
+        : roundMoney(((night / 60) * rate * (part.nightPercent ?? 0)) / 100);
+    return {
+      entry: part,
+      month: part.date.slice(0, 7),
+      minutes,
+      nightMinutes: night,
+      norm: getWorkNorm(part.date.slice(0, 7))?.hours ?? null,
+      rate,
+      base,
+      supplement,
+      total:
+        base === null || supplement === null
+          ? null
+          : roundMoney(base + supplement),
+    };
+  });
 }
 export function amount(entry: Entry, months: AppData["months"]): number | null {
-  const rate = entryRate(entry, months);
-  return rate === null
+  const parts = calculationParts(entry, months);
+  return parts.some((part) => part.total === null)
     ? null
-    : Math.round(
-        ((durationMinutes(entry) / 60) * rate * entry.multiplier +
-          Number.EPSILON) *
-          100,
-      ) / 100;
+    : roundMoney(parts.reduce((sum, part) => sum + part.total!, 0));
 }
 export function formatDuration(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -155,7 +256,8 @@ export function newEntry(profile: Profile, date = localDate()): Entry {
     start: "18:00",
     end: "20:00",
     breakMinutes: 0,
-    multiplier: 1,
+    multiplier: 2,
+    nightPercent: DEFAULT_NIGHT_PERCENT,
     ...profile,
     dayStatus: "qeyri-iş saatı",
     subject: "",
@@ -166,7 +268,7 @@ export function newEntry(profile: Profile, date = localDate()): Entry {
 function interval(entry: Entry): [number, number] {
   const day = Date.parse(`${entry.date}T00:00:00Z`) / 60000;
   const start = day + timeMinutes(entry.start);
-  let end = day + timeMinutes(entry.end);
+  let end = day + timeMinutes(entry.end, true);
   if (end <= start) end += 1440;
   return [start, end];
 }
@@ -185,9 +287,21 @@ export function overlaps(entry: Entry, others: Entry[]): boolean {
 }
 export function fingerprint(entry: Entry): string {
   // A rate assigned after importing an unpriced row does not make it a new work record.
-  const { id: _id, rate: _rate, ...rest } = entry;
+  const {
+    id: _id,
+    rate: _rate,
+    rates: _rates,
+    sourceId: _sourceId,
+    nightPercent,
+    ...rest
+  } = entry;
+  const normalized = {
+    ...rest,
+    end: rest.end === "00:00" ? "24:00" : rest.end,
+    nightPercent: nightPercent ?? 0,
+  };
   return JSON.stringify(
-    Object.entries(rest).sort(([a], [b]) => a.localeCompare(b)),
+    Object.entries(normalized).sort(([a], [b]) => a.localeCompare(b)),
   );
 }
 const textFields = [
@@ -234,6 +348,34 @@ export function validateEntry(value: unknown): Entry {
       result.rate > 1e9)
   )
     throw new Error("Saatlıq tarif düzgün deyil.");
+  if (row.nightPercent !== undefined) {
+    if (
+      typeof row.nightPercent !== "number" ||
+      !Number.isFinite(row.nightPercent) ||
+      row.nightPercent < 0 ||
+      row.nightPercent > 1000
+    )
+      throw new Error("Gecə əlavəsi 0–1000% aralığında olmalıdır.");
+    result.nightPercent = row.nightPercent;
+    if (result.nightPercent > 0 && result.breakMinutes > 0)
+      throw new Error(
+        "Gecə əlavəsi üçün fasiləli qeydi faktiki işlənmiş ayrı vaxt aralıqları ilə daxil et.",
+      );
+  }
+  if (row.rates !== undefined) {
+    result.rates = {};
+    for (const [month, rate] of Object.entries(object(row.rates))) {
+      if (
+        !isMonth(month) ||
+        typeof rate !== "number" ||
+        !Number.isFinite(rate) ||
+        rate < 0 ||
+        rate > 1e9
+      )
+        throw new Error("Aylıq tarif düzgün deyil.");
+      result.rates[month] = rate;
+    }
+  }
   durationMinutes(result);
   return result;
 }
@@ -265,8 +407,15 @@ export function validateData(value: unknown): AppData {
       config.hours > 744
     )
       throw new Error("Aylıq maaş və ya norma saatı düzgün deyil.");
+    if (
+      config.basis !== undefined &&
+      config.basis !== "net" &&
+      config.basis !== "gross"
+    )
+      throw new Error("Maaşın növü düzgün deyil.");
     result.months[month] = {
       salary: config.salary,
+      ...(config.basis ? { basis: config.basis as "net" | "gross" } : {}),
       hours: getWorkNorm(month)?.hours ?? config.hours,
     };
   }
@@ -283,6 +432,7 @@ export function mergeData(
   imported: AppData,
 ): { data: AppData; added: number; skipped: number } {
   const seen = new Set(current.entries.map(fingerprint));
+  const dailySeen = new Set(dailyEntries(current.entries).map(fingerprint));
   const ids = new Set(current.entries.map((e) => e.id));
   const months = { ...imported.months, ...current.months };
   const added: Entry[] = [];
@@ -295,11 +445,25 @@ export function mergeData(
         raw.rate ??
         hourlyRate(imported.months[key] ?? current.months[key], key),
     };
-    if (seen.has(fingerprint(entry))) continue;
+    const parts = dailyEntries([entry], imported.months);
+    if (
+      seen.has(fingerprint(entry)) ||
+      parts.every((part) => dailySeen.has(fingerprint(part)))
+    )
+      continue;
+    // A previously imported monthly report may contain only one side of a shift.
+    // Add its missing side without duplicating the already imported hours.
+    const candidates = parts.some((part) => dailySeen.has(fingerprint(part)))
+      ? parts.filter((part) => !dailySeen.has(fingerprint(part)))
+      : [entry];
+    for (const candidate of candidates) {
+      const { sourceId: _source, ...saved } = candidate;
+      if (_source || ids.has(saved.id)) saved.id = crypto.randomUUID();
+      ids.add(saved.id);
+      added.push(saved);
+    }
+    parts.forEach((part) => dailySeen.add(fingerprint(part)));
     seen.add(fingerprint(entry));
-    if (ids.has(entry.id)) entry.id = crypto.randomUUID();
-    ids.add(entry.id);
-    added.push(entry);
   }
   return {
     data: { ...current, months, entries: [...current.entries, ...added] },

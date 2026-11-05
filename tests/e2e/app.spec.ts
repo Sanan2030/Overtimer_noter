@@ -6,7 +6,7 @@ async function setSalary(page: Page, month = "2026-10", salary = "1320") {
   await page.getByRole("button", { name: "Aylıq maaş", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Ay", { exact: true }).fill(month);
-  await dialog.getByLabel("Net maaş (AZN)").fill(salary);
+  await dialog.getByLabel("Tarif maaşı — brutto (AZN)").fill(salary);
   await expect(dialog.locator(".norm-note")).toContainText("saat");
   await expect(dialog.locator('input[type="number"]')).toHaveCount(1);
   await dialog.getByRole("button", { name: "Ayarları saxla" }).click();
@@ -20,10 +20,9 @@ async function addEntry(
   await page.getByRole("button", { name: "Yeni qeyd", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Mövzu", { exact: true }).fill(subject);
-  if (multiplier !== 1)
-    await dialog
-      .getByRole("button", { name: `${multiplier}x`, exact: true })
-      .click();
+  await dialog
+    .getByRole("button", { name: `${multiplier}x`, exact: true })
+    .click();
   await dialog
     .getByRole("button", { name: "Qeydi saxla", exact: true })
     .click();
@@ -49,7 +48,11 @@ test("calculates overtime, persists after reload and exports a complete JSON bac
   const download = await downloadPromise;
   const backup = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(backup.entries).toHaveLength(1);
-  expect(backup.months["2026-10"]).toEqual({ salary: 1320, hours: 176 });
+  expect(backup.months["2026-10"]).toEqual({
+    salary: 1320,
+    hours: 176,
+    basis: "gross",
+  });
   expect(errors).toEqual([]);
 });
 
@@ -239,13 +242,14 @@ test("mobile layout has no page overflow and supports a new overnight record", a
   await expect(dialog.getByLabel("Fasilə (dəqiqə)")).toHaveCount(0);
   await dialog.getByRole("button", { name: "2x", exact: true }).click();
   await dialog.getByLabel("Mövzu", { exact: true }).fill("Gecə işi");
-  await expect(dialog).toContainText("60,00");
+  await expect(dialog).toContainText("66,00");
   await dialog
     .getByRole("button", { name: "Qeydi saxla", exact: true })
     .click();
   await expect(
     page.getByRole("row").filter({ hasText: "Gecə işi" }),
-  ).toContainText("60,00");
+  ).toHaveCount(2);
+  await expect(page.locator(".record-summary-inline")).toContainText("66,00");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -401,13 +405,13 @@ test("March salary uses 111 official hours and all record fields are in one wind
   await expect(dialog.getByLabel("Fasilə (dəqiqə)")).toHaveCount(0);
   await expect(dialog.locator("details")).toHaveCount(0);
   await dialog.getByLabel("Mövzu", { exact: true }).fill("Mart norması");
-  await expect(dialog.locator(".calculation")).toContainText("21,62");
+  await expect(dialog.locator(".calculation")).toContainText("43,24");
   await dialog
     .getByRole("button", { name: "Qeydi saxla", exact: true })
     .click();
   await expect(
     page.getByRole("row").filter({ hasText: "Mart norması" }),
-  ).toContainText("21,62");
+  ).toContainText("43,24");
 });
 
 test("dark mode is saved and applies to forms without affecting records", async ({
@@ -429,4 +433,100 @@ test("dark mode is saved and applies to forms without affecting records", async 
     .getByRole("button", { name: "Açıq rejimə keç", exact: true })
     .click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("month-end shift is split into 5 October hours and 2 November hours with separate night pay", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await setSalary(page, "2026-10", "1320");
+  await page.getByRole("button", { name: "Yeni qeyd", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Tarix", { exact: true }).fill("2026-10-31");
+  await dialog.getByLabel("Başlanma", { exact: true }).fill("19:00");
+  await dialog.getByLabel("Bitmə", { exact: true }).fill("02:00");
+  await dialog.getByLabel("Mövzu", { exact: true }).fill("Aylararası iş");
+  await dialog.getByLabel("Tarix", { exact: true }).fill("");
+  await expect(dialog).toContainText("Düzgün tarix seç.");
+  await dialog.getByLabel("Tarix", { exact: true }).fill("2026-10-31");
+  await expect(
+    dialog.getByRole("button", { name: "2x", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.locator(".pay-breakdown")).toContainText("78,00");
+  await expect(dialog.locator(".pay-breakdown")).toContainText("Tarif yoxdur");
+  await dialog
+    .getByRole("button", { name: "Qeydi saxla", exact: true })
+    .click();
+  await setSalary(page, "2026-11", "1320");
+  let row = page.getByRole("row").filter({ hasText: "Aylararası iş" });
+  await expect(row).toContainText("01.11.2026");
+  await expect(row).toContainText("02:00");
+  await expect(row).toContainText("38,21");
+  await row.getByRole("button", { name: /qeydini redaktə et/ }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Tarix", { exact: true })).toHaveValue(
+    "2026-10-31",
+  );
+  await expect(dialog.locator(".calculation")).toContainText("116,21");
+  await dialog.getByRole("button", { name: "Ləğv et", exact: true }).click();
+  await page.getByLabel("Hesabat dövrü").selectOption("2026-10");
+  await expect(row).toContainText("05:00");
+  await expect(row).toContainText("78,00");
+  await page.getByLabel("Hesabat dövrü").selectOption("all");
+  await expect(row).toHaveCount(2);
+  await expect(page.locator(".record-summary-inline")).toContainText("116,21");
+  await page.reload();
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("overtime-noter:v1")!),
+  );
+  expect(stored.entries).toHaveLength(1);
+  expect(stored.entries[0].date).toBe("2026-10-31");
+  await page.getByLabel("Hesabat dövrü").selectOption("2026-11");
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Aylararası iş" })
+    .getByRole("button", { name: /qeydini sil/ })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Qeydi sil", exact: true })
+    .click();
+  await page.getByLabel("Hesabat dövrü").selectOption("all");
+  await expect(
+    page.getByRole("row").filter({ hasText: "Aylararası iş" }),
+  ).toHaveCount(0);
+});
+
+test("a legacy net salary stays labelled and is not silently treated as gross", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "overtime-noter:v1",
+      JSON.stringify({
+        version: 1,
+        profile: {
+          employee: "",
+          manager: "",
+          customer: "",
+          project: "",
+          environment: "ofis şəraiti",
+        },
+        months: { "2026-10": { salary: 1320, hours: 176 } },
+        entries: [],
+      }),
+    );
+  });
+  await page.goto("/");
+  await page.getByLabel("Hesabat dövrü").selectOption("2026-10");
+  await expect(page.locator(".salary-button")).toContainText("əvvəlki net");
+  await page.getByRole("button", { name: "Aylıq maaş", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Əvvəlki net maaş: 1");
+  await expect(dialog.getByLabel("Tarif maaşı — brutto (AZN)")).toHaveValue("");
+  await dialog.getByRole("button", { name: "Ləğv et", exact: true }).click();
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("overtime-noter:v1")!),
+  );
+  expect(stored.months["2026-10"]).toEqual({ salary: 1320, hours: 176 });
 });

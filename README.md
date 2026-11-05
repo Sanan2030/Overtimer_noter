@@ -36,15 +36,23 @@ Rəsmi mənbə: <https://sosial.gov.az/az/faydali/istehsalat-teqvimi>
 ## Hesablama
 
 ```text
-Saatlıq tarif = ayın net maaşı / həmin ayın rəsmi norma saatı
-Məbləğ = əlavə iş dəqiqəsi / 60 × saatlıq tarif × əmsal
+Saatlıq tarif = həmin ayın brutto tarif maaşı / həmin ayın rəsmi norma saatı
+Əsas məbləğ = həmin gün işlənmiş saat × saatlıq tarif × seçilən əmsal
+Gecə əlavəsi = 22:00–06:00 aralığındakı saat × saatlıq tarif × gecə faizi / 100
+Yekun = əsas məbləğ + gecə əlavəsi
 ```
 
-Əmsal standart **1x**, seçimlər **2x** və **3x**. Faktiki iş müddəti əmsala vurulmur. 2026 martda 1 200 AZN maaş və 2 saat overtime: `1200 / 111 × 2 = 21,62 AZN`; 2x ilə 43,24 AZN. Məbləğ hər qeyddə qəpiyə yuvarlaqlaşdırılır, yekun həmin məbləğlərin cəmidir.
+Yeni qeyddə **2x** və **20% gecə əlavəsi** seçilir; 1x/2x/3x və müqavilədəki gecə faizi dəyişdirilə bilər. Çoxnövbəli rejimdə gecə növbəsi üçün 40% seçilir. Gecə əlavəsi overtime əmsalına vurulmur. Əsas və gecə məbləği hər gün üzrə qəpiyə yuvarlaqlaşdırılır, yekun onların cəmidir.
 
-Hər ayın maaşı ayrıca saxlanır. Ayın maaşı dəyişəndə həmin ayın qeydləri rəsmi norma ilə yenidən hesablanır; digər aylar dəyişmir. Əvvəlki JSON-dakı əl ilə daxil edilmiş norma təsdiqlənmiş rəsmi norma ilə yenilənir. Aylıq maaş məlumdursa köhnə saxlanmış tarif rəsmi hesablamanı əvəz etmir. Maaş olmayan idxal qeydlərinin məlum tarifi qorunur.
+**31.10.2026 19:00 → 01.11.2026 02:00** qeydi: oktyabrda 5 saat (2 saat gecə), noyabrda 2 saat (2 saat gecə). Oktyabr norması 176, noyabr norması 152 saatdır. Hər iki ayın brutto tarif maaşı 1320 AZN, əmsal 2x və gecə əlavəsi 20% olarsa: oktyabr **78,00 AZN**, noyabr **38,21 AZN**, cəmi **116,21 AZN**. Növbəti ayın maaşı yoxdursa əvvəlki ayın tarifi ona tətbiq edilmir; həmin hissə tarifsiz görünür.
 
-Bitmə saatı başlanmadan erkəndirsə növbəti günə aiddir; qeyd başlanma tarixinin ayına hesablanır. Eyni başlanma/bitmə qəbul edilmir. Eyni əməkdaşın üst-üstə düşən qeydlərinə xəbərdarlıq göstərilir.
+Qeyd JSON-da bir bütöv vaxt aralığı kimi saxlanır. İnterfeys, aylıq analiz və Excel onu təqvim günlərinə bölür. İstənilən hissədən redaktə/silmə ilkin qeydə tətbiq edilir. Excel gündəlik hissələri idxal edir və mövcud bütöv qeydin təkrar hissələrini ötürür.
+
+Əmək Məcəlləsinin 164-cü maddəsinə görə aylıq maaş alanların istirahət/bayram günündə norma daxilində işi üçün maaşdan əlavə minimum 1x, normadan artıq işi üçün minimum 2x ödənilir. Adi iş günündə overtime üçün 165-ci maddə minimum 2x müəyyən edir. Tətbiq normal iş qrafikini və bütün adi iş saatlarını saxlamadığı üçün norma daxilində/üstündə olmasını özü müəyyən etmir; əmsalı istifadəçi seçir. Mənbə: <https://e-qanun.az/framework/46943> (97, 164–166).
+
+Hər ayın maaşı ayrıca saxlanır. Maaş dəyişəndə yalnız həmin ayın hissələri yenidən hesablanır. Əvvəlki JSON-dakı əl ilə daxil edilmiş norma rəsmi norma ilə yenilənir. Əvvəlki net maaş avtomatik brutto kimi adlandırılmır: yadda saxlanır və ayrıca işarələnir; maaş formasında brutto tarif maaşı ayrıca daxil edilməlidir. Əvvəlki qeydlərdə gecə əlavəsi 0% qalır; redaktə edərək faiz təyin etmək olar. Köhnə fasiləli qeydlərdə fasilənin vaxtı məlum olmadığı üçün günlər üzrə dəqiqələr proporsional bölünür; dəqiq gecə əlavəsi üçün faktiki işlənmiş fasiləsiz aralıqlar daxil edilməlidir.
+
+Eyni başlanma/bitmə qəbul edilmir. Eyni əməkdaşın üst-üstə düşən qeydlərinə xəbərdarlıq göstərilir.
 
 Köhnə JSON/Excel-dəki fasilə məlumatı idxalda qorunur. Yeni forma fasiləsiz qeyd yaradır; köhnə qeyd bu formada redaktə edilərsə saxlayanda müddət tam başlanma–bitmə aralığına görə hesablanır.
 
@@ -71,7 +79,7 @@ Fayl **Aylıq yekun** vərəqi ilə açılır: ay, maaş, rəsmi norma, saatlıq
 
 İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb.
 
-Sonda Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN) gəlir. Qruplaşdırılmış başlıqlar, mətnə uyğun sətir hündürlüyü, incə xətlər, növbələnən sətir rəngi, cəmi sətri, filtr, sabit başlıq və pul/tarix/saat formatları tətbiq olunur. Aylıq yekun A4, detallı cədvəl A3 üfüqi çap üçün qurulub; hər səhifədə başlıq təkrarlanır.
+Sonda Əmsal, Saatlıq tarif (AZN), Məbləğ (AZN), Gecə müddəti, Gecə əlavəsi (%), Gecə əlavəsi (AZN), Əsas məbləğ (AZN) gəlir. Qruplaşdırılmış başlıqlar, mətnə uyğun sətir hündürlüyü, incə xətlər, növbələnən sətir rəngi, cəmi sətri, filtr, sabit başlıq və pul/tarix/saat formatları tətbiq olunur. Aylıq yekun A4, detallı cədvəl A3 üfüqi çap üçün qurulub; hər səhifədə başlıq təkrarlanır.
 
 İdxal `.xlsx` və `.json` üçün ən çox 10 MB / 50 000 qeyddir. Excel-də Tarix, Başlanma və Bitmə başlıqları ilk 30 sətirdə olmalıdır. Köhnə 14 sütunlu və yeni format idxal olunur. Səhv sətir varsa bütün idxal dayandırılır. Köhnə `.xls` faylını əvvəlcə `.xlsx` kimi saxlayın.
 

@@ -33,6 +33,8 @@ import {
   AppData,
   displayDate,
   durationMinutes,
+  dailyEntries,
+  nightMinutes,
   emptyData,
   Entry,
   entryRate,
@@ -239,6 +241,13 @@ export default function OvertimeApp() {
     [corruptRaw, notify],
   );
   const month = period && period !== "all" ? period : localDate().slice(0, 7);
+  const ledger = useMemo(
+    () => dailyEntries(data.entries, data.months),
+    [data.entries, data.months],
+  );
+  const originalEntry = (entry: Entry) =>
+    data.entries.find((item) => item.id === (entry.sourceId ?? entry.id)) ??
+    entry;
   const months = useMemo(
     () =>
       [
@@ -246,23 +255,23 @@ export default function OvertimeApp() {
           period === "all" ? localDate().slice(0, 7) : period,
           localDate().slice(0, 7),
           ...Object.keys(data.months),
-          ...data.entries.map((e) => e.date.slice(0, 7)),
+          ...ledger.map((e) => e.date.slice(0, 7)),
         ]),
       ]
         .filter(Boolean)
         .sort()
         .reverse(),
-    [data, period],
+    [data, period, ledger],
   );
   const selectedEntries = useMemo(
     () =>
-      data.entries
+      ledger
         .filter((entry) => period === "all" || entry.date.startsWith(period))
         .sort(
           (a, b) =>
             b.date.localeCompare(a.date) || b.start.localeCompare(a.start),
         ),
-    [data.entries, period],
+    [ledger, period],
   );
   const projects = [
     ...new Set(selectedEntries.map((e) => e.project).filter(Boolean)),
@@ -542,7 +551,13 @@ export default function OvertimeApp() {
                     {data.months[month] ? (
                       <>
                         : <strong>{money(data.months[month].salary)} ₼</strong>
-                        <small> / {getWorkNorm(month)?.hours ?? "—"} s</small>
+                        <small>
+                          {" "}
+                          / {getWorkNorm(month)?.hours ?? "—"} s ·{" "}
+                          {data.months[month].basis === "gross"
+                            ? "brutto"
+                            : "əvvəlki net"}
+                        </small>
                       </>
                     ) : (
                       " əlavə et"
@@ -568,10 +583,19 @@ export default function OvertimeApp() {
             <Stats entries={selectedEntries} data={data} compact />
             {!data.months[month] && period !== "all" && (
               <p className="setup-note">
-                “Aylıq maaş” bölməsində net maaşını daxil et. Rəsmi norma saatı
-                avtomatik seçilir.
+                “Aylıq maaş” bölməsində brutto tarif maaşını daxil et. Rəsmi
+                norma saatı avtomatik seçilir.
               </p>
             )}
+            {data.months[month] &&
+              data.months[month].basis !== "gross" &&
+              period !== "all" && (
+                <p className="setup-note">
+                  Bu ayın hesablamasında əvvəlki net maaş istifadə olunur.
+                  Qanuni məbləğ üçün “Aylıq maaş” bölməsində brutto tarif
+                  maaşını daxil et.
+                </p>
+              )}
             <section
               className="panel records-panel"
               aria-label="Əlavə iş qeydləri"
@@ -708,7 +732,11 @@ export default function OvertimeApp() {
                               <strong>
                                 {formatDuration(durationMinutes(entry))}
                               </strong>
-                              <small>saat : dəqiqə</small>
+                              <small>
+                                {nightMinutes(entry)
+                                  ? `${formatDuration(nightMinutes(entry))} gecə`
+                                  : "saat : dəqiqə"}
+                              </small>
                             </td>
                             <td>
                               <span className={`pill pill-${entry.multiplier}`}>
@@ -725,6 +753,9 @@ export default function OvertimeApp() {
                                 {entryRate(entry, data.months) === null
                                   ? "Tarif yoxdur"
                                   : `${money(entryRate(entry, data.months)!)} ₼ / saat`}
+                                {(entry.nightPercent ?? 0) > 0 &&
+                                  nightMinutes(entry) > 0 &&
+                                  ` + ${entry.nightPercent}% gecə`}
                               </small>
                             </td>
                             <td>
@@ -734,7 +765,7 @@ export default function OvertimeApp() {
                                   aria-label={`${displayDate(entry.date)} qeydini redaktə et`}
                                   onClick={() =>
                                     setEntryModal({
-                                      entry: { ...entry },
+                                      entry: { ...originalEntry(entry) },
                                       editing: true,
                                     })
                                   }
@@ -747,7 +778,7 @@ export default function OvertimeApp() {
                                   onClick={() =>
                                     setEntryModal({
                                       entry: {
-                                        ...entry,
+                                        ...originalEntry(entry),
                                         id: crypto.randomUUID(),
                                       },
                                       editing: false,
@@ -759,7 +790,9 @@ export default function OvertimeApp() {
                                 <button
                                   className="icon-button danger-icon"
                                   aria-label={`${displayDate(entry.date)} qeydini sil`}
-                                  onClick={() => setDeleteEntry(entry)}
+                                  onClick={() =>
+                                    setDeleteEntry(originalEntry(entry))
+                                  }
                                 >
                                   <Trash2 size={15} />
                                 </button>
@@ -1042,7 +1075,10 @@ export default function OvertimeApp() {
             const hours = getWorkNorm(key)!.hours;
             const success = commit((old) => ({
               ...old,
-              months: { ...old.months, [key]: { salary, hours } },
+              months: {
+                ...old.months,
+                [key]: { salary, hours, basis: "gross" },
+              },
               entries: old.entries.map((e) =>
                 e.date.startsWith(key) ? { ...e, rate: salary / hours } : e,
               ),
@@ -1065,8 +1101,8 @@ export default function OvertimeApp() {
         >
           <div className="modal-body">
             <p>
-              Bu qeyd silinəcək. Əvvəlki JSON ehtiyat nüsxəndən onu yenidən
-              bərpa edə bilərsən.
+              Bu qeyd bütün günlərə düşən hissələri ilə birlikdə silinəcək.
+              Əvvəlki JSON ehtiyat nüsxəndən onu yenidən bərpa edə bilərsən.
             </p>
           </div>
           <div className="modal-footer">
@@ -1136,17 +1172,20 @@ export default function OvertimeApp() {
               <span>01</span>
               <h3>Aylıq maaşını daxil et</h3>
               <p>
-                Saatlıq tarif = aylıq net maaş ÷ həmin ay üçün ƏƏSMN-nin rəsmi
-                norma saatı. Yalnız maaşını daxil edirsən.
+                Saatlıq tarif = aylıq brutto tarif maaşı ÷ həmin ay üçün
+                ƏƏSMN-nin rəsmi norma saatı. Yalnız maaşını daxil edirsən.
               </p>
             </div>
             <div>
               <span>02</span>
               <h3>Vaxtını və əmsalı seç</h3>
               <p>
-                Məbləğ = faktiki saat × saatlıq tarif × əmsal. 1x standartdır;
-                2x və 3x də seçilə bilər. Müddət başlanma və bitmə saatlarına
-                əsasən hesablanır.
+                Məbləğ = faktiki saat × həmin ayın tarifi × seçilən əmsal + gecə
+                əlavəsi. Yeni qeyddə 2x seçilir; əmsalı işin növünə uyğun dəyişə
+                bilərsən. 22:00–06:00 gecə saatlarıdır. Ay dəyişəndə hər hissə
+                öz ayının maaşı və norması ilə hesablanır. Norma
+                daxilində/üstündə olması normal iş qrafiki bilinmədən avtomatik
+                müəyyən edilmir.
               </p>
             </div>
             <div>
@@ -1164,7 +1203,17 @@ export default function OvertimeApp() {
               <p>
                 Excel ixracında ilk 14 sütun şirkət cədvəlinə uyğundur; əlavə
                 sütunlarda əmsal, tarif və məbləğ görünür. Aylıq yekun ayrıca
-                vərəqdədir.
+                vərəqdədir. Gecə saatları, əlavə faizi və gecə məbləği ayrıca
+                göstərilir. Gecə əlavəsi saatlıq tarifə tətbiq olunur, overtime
+                əmsalına vurulmur. Əvvəlki qeydlər gecə əlavəsiz saxlanır;
+                istəsən redaktə edə bilərsən.
+                <a
+                  href="https://e-qanun.az/framework/46943"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Əmək Məcəlləsi: 97, 164–166 ↗
+                </a>
               </p>
             </div>
           </div>
@@ -1208,7 +1257,11 @@ function SalaryForm({
 }) {
   const [month, setMonth] = useState(initialMonth);
   const [salary, setSalary] = useState(
-    String(data.months[initialMonth]?.salary ?? ""),
+    String(
+      data.months[initialMonth]?.basis === "gross"
+        ? data.months[initialMonth].salary
+        : "",
+    ),
   );
   const norm = getWorkNorm(month);
   const hours = norm?.hours ?? null;
@@ -1217,7 +1270,7 @@ function SalaryForm({
   return (
     <Modal
       title="Aylıq maaş ayarları"
-      subtitle="Net maaşını daxil et. Ayın norma saatı rəsmi təqvimdən seçilir."
+      subtitle="Brutto tarif (vəzifə) maaşını daxil et. Norma saatı rəsmi təqvimdən seçilir."
       close={close}
     >
       <form
@@ -1232,7 +1285,9 @@ function SalaryForm({
             Number(hours) <= 0 ||
             Number(hours) > 744
           ) {
-            setError("Ayı, net maaşı və düzgün rəsmi norma avtomatik seçilir.");
+            setError(
+              "Ayı və brutto tarif maaşını düzgün daxil et; norma avtomatik seçilir.",
+            );
             return;
           }
           save(month, Number(salary));
@@ -1249,12 +1304,25 @@ function SalaryForm({
               onChange={(e) => {
                 const key = e.target.value;
                 setMonth(key);
-                setSalary(String(data.months[key]?.salary ?? ""));
+                setSalary(
+                  String(
+                    data.months[key]?.basis === "gross"
+                      ? data.months[key].salary
+                      : "",
+                  ),
+                );
               }}
             />
           </Field>
+          {data.months[month] && data.months[month].basis !== "gross" && (
+            <p className="inline-info">
+              Əvvəlki net maaş: {money(data.months[month].salary)} ₼. Bu dəyər
+              dəyişdirilməyib. Qanuni hesablama üçün brutto tarif maaşını ayrıca
+              daxil et.
+            </p>
+          )}
           <div className="form-grid two">
-            <Field label="Net maaş (AZN)">
+            <Field label="Tarif maaşı — brutto (AZN)">
               <input
                 type="number"
                 required
@@ -1446,8 +1514,9 @@ function MonthComparison({ data, month }: { data: AppData; month: string }) {
   const date = new Date(`${month}-01T12:00:00`);
   date.setMonth(date.getMonth() - 1);
   const previous = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-  const now = data.entries.filter((e) => e.date.startsWith(month));
-  const before = data.entries.filter((e) => e.date.startsWith(previous));
+  const ledger = dailyEntries(data.entries, data.months);
+  const now = ledger.filter((e) => e.date.startsWith(month));
+  const before = ledger.filter((e) => e.date.startsWith(previous));
   const minutes = now.reduce((s, e) => s + durationMinutes(e), 0),
     previousMinutes = before.reduce((s, e) => s + durationMinutes(e), 0);
   const total = now.reduce((s, e) => s + (amount(e, data.months) ?? 0), 0),

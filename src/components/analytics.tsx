@@ -12,6 +12,8 @@ import {
   amount,
   AppData,
   durationMinutes,
+  dailyEntries,
+  nightMinutes,
   Entry,
   formatDuration,
   money,
@@ -51,7 +53,13 @@ export function Stats({
             .replace(".", ",")}{" "}
           <small>saat</small>
         </div>
-        <p>Faktiki işlənmiş vaxt</p>
+        <p>
+          Faktiki işlənmiş vaxt ·{" "}
+          {formatDuration(
+            entries.reduce((sum, entry) => sum + nightMinutes(entry), 0),
+          )}{" "}
+          gecə
+        </p>
       </div>
       <div className="stat-card">
         <div className="stat-label">
@@ -66,7 +74,7 @@ export function Stats({
         <p>
           {unpriced
             ? `${unpriced} qeyd üçün tarif daxil edilməyib`
-            : "Əmsallar nəzərə alınmaqla"}
+            : "Əmsal və gecə əlavəsi daxil"}
         </p>
       </div>
       {!compact && (
@@ -107,7 +115,9 @@ export function Trend({ data, month }: { data: AppData; month: string }) {
   const points = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(base.getFullYear(), base.getMonth() - 5 + index, 1);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const entries = data.entries.filter((e) => e.date.startsWith(key));
+    const entries = dailyEntries(data.entries, data.months).filter((e) =>
+      e.date.startsWith(key),
+    );
     return {
       key,
       label: [

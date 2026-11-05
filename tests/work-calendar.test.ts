@@ -24,7 +24,10 @@ test("verified monthly calendars agree with the ministry's published annual tota
 test("March's divisor is year-specific: 111 hours in 2026 and 110 in 2025", () => {
   assert.equal(getWorkNorm("2026-03")?.hours, 111);
   assert.equal(getWorkNorm("2025-03")?.hours, 110);
-  const entry = newEntry(emptyProfile, "2026-03-10");
+  const entry = {
+    ...newEntry(emptyProfile, "2026-03-10"),
+    multiplier: 1 as const,
+  };
   assert.equal(
     amount(entry, { "2026-03": { salary: 1200, hours: 160 } }),
     21.62,
@@ -38,7 +41,11 @@ test("March's divisor is year-specific: 111 hours in 2026 and 110 in 2025", () =
   );
 });
 test("legacy manual hours and stale rates cannot override the official salary divisor", () => {
-  const entry = { ...newEntry(emptyProfile, "2026-03-10"), rate: 7.5 };
+  const entry = {
+    ...newEntry(emptyProfile, "2026-03-10"),
+    multiplier: 1 as const,
+    rate: 7.5,
+  };
   const restored = validateData({
     ...emptyData(),
     months: { "2026-03": { salary: 1110, hours: 160 } },
@@ -61,7 +68,14 @@ test("unknown years and invalid months are not estimated as official norms", () 
 });
 test("an explicitly imported tariff is retained if there is no monthly salary", () => {
   assert.equal(
-    amount({ ...newEntry(emptyProfile, "2026-03-10"), rate: 7.5 }, {}),
+    amount(
+      {
+        ...newEntry(emptyProfile, "2026-03-10"),
+        multiplier: 1 as const,
+        rate: 7.5,
+      },
+      {},
+    ),
     15,
   );
 });
