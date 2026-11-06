@@ -39,7 +39,7 @@ Məsələn, 1 200 AZN / 160 saat = 7,50 AZN/saat. 18:00–20:00 aralığı 1x ü
 - Qeydlərim: ay seçimi, Aylıq maaş düyməsi, cəmi saat və cəmi məbləğ, Yeni qeyd düyməsi və qeydlər. Əsas ekranda qrafik yoxdur.
 - Yeni qeyd: tarix, iki saat, əmsal, mövzu; müddət və məbləğ dərhal görünür. Digər məlumat xanaları da eyni pəncərədə açıq görünür.
 - Qeydlər masaüstündə sadə cədvəl, telefonda asan oxunan kartlardır.
-- Analiz: iki yekun göstərici, aylıq trend və layihə bölgüsü. Digər qrafiklər “Daha ətraflı analiz” altında açılır.
+- Analiz: son Stitch HTML əsasında dörd göstərici (saat, məbləğ, gündəlik orta, əsas əmsal payı), altı aylıq sütun qrafiki, layihə və əmsal dairələri, təqvim həftələri üzrə yük və aylararası müqayisə. Əlavə bölgülər “Daha ətraflı analiz” altında qalır. Açıq/tünd rejim və mobil quruluş dəstəklənir. Nümunə rəqəmlər yerinə real qeydlər istifadə olunur; süni overtime limiti yoxdur.
 - Fayllar: JSON endir, Excel endir, Fayl seç. İdxalın əvvəlcədən icmalı və təsdiqi saxlanılır.
 
 Excel-də yalnız bu 14 sütun var: İl, Ay, Əməkdaş, Şöbə müdiri, Müştəri, Layihə, Tarix, Başlanma, Bitmə, İcra günü statusu, İş mühiti, Müddət (saat: dəqiqə), Mövzu, Səbəb. Bir vərəq, açıq yaşıl başlıq və incə yaşıl çərçivə (seçilmiş 2-ci variant). Əlavə sütun, başlıq və yekun sətri yoxdur. Maaş və əmsal daxil bütün məlumatları saxlamaq üçün JSON istifadə edilir.
@@ -70,7 +70,7 @@ Use three simple top tabs: “Qeydlərim”, “Analiz”, and “Fayllar”.
 3. Monthly salary settings: month/year, monthly net salary in AZN, a read-only official monthly norm from the Azerbaijan Ministry of Labour production calendar, and a read-only hourly rate. The user cannot enter the monthly hours.
    Amount = worked hours × (net salary / monthly normal hours)
    × multiplier. Two actual hours at 3x remain two hours in time summaries.
-4. Analiz: monthly hours/amount, a monthly trend, and project breakdown.
+4. Analiz: four live metrics, a six-month bar chart, project and multiplier donuts, calendar-week workload, and a previous-month comparison. Use real records, net salary and 1x/2x/3x only; no invented overtime limit.
    Put customer, reason, environment, weekday, multiplier, and previous-month
    comparison behind “Daha ətraflı analiz”.
 5. Fayllar: download a complete JSON backup, restore/merge JSON, export XLSX,

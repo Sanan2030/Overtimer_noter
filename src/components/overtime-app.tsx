@@ -42,7 +42,6 @@ import {
   mergeData,
   money,
   monthLabel,
-  hourlyRate,
   newEntry,
   validateData,
 } from "@/lib/model";
@@ -58,14 +57,8 @@ import { STORAGE_KEY } from "@/lib/model";
 import { getWorkNorm, CALENDAR_INDEX_URL } from "@/lib/work-calendar";
 import { EntryForm } from "./entry-form";
 import ThemeToggle from "./theme-toggle";
-import {
-  ActivitySummary,
-  Breakdown,
-  Multipliers,
-  Stats,
-  Trend,
-  Weekdays,
-} from "./analytics";
+import { Stats } from "./analytics";
+import { AnalyticsDashboard } from "./analytics-dashboard";
 import { EmptyState, Field, Modal } from "./ui";
 
 type Page = "records" | "analytics" | "data";
@@ -418,7 +411,9 @@ export default function OvertimeApp() {
     );
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell${page === "analytics" ? " analytics-shell" : ""}`}
+    >
       <header className="app-header">
         <div className="header-inner">
           <a
@@ -495,17 +490,17 @@ export default function OvertimeApp() {
           </div>
         )}
 
-        {page !== "records" ? (
+        {page === "data" ? (
           <div className="page-heading">
             <div>
               <h1>{TITLES[page]}</h1>
               <p>{SUBTITLES[page]}</p>
             </div>
           </div>
-        ) : (
+        ) : page === "records" ? (
           <h1 className="sr-only">Əlavə iş saatları</h1>
-        )}
-        {page !== "data" && (
+        ) : null}
+        {page === "records" && (
           <div className="period-toolbar">
             <div className="period-left">
               <div className="period-selector">
@@ -886,45 +881,19 @@ export default function OvertimeApp() {
           </>
         )}
         {page === "analytics" && (
-          <>
-            <Stats entries={selectedEntries} data={data} compact />
-            <div className="analytics-grid">
-              <Trend data={data} month={period} />
-              <Breakdown
-                entries={selectedEntries}
-                field="project"
-                title="Layihələr üzrə"
-                subtitle="Layihələrə sərf olunan vaxt"
-              />
-            </div>
-            <details className="analysis-details">
-              <summary>Daha ətraflı analiz</summary>
-              <ActivitySummary entries={selectedEntries} />
-              <div className="analytics-grid">
-                <Multipliers entries={selectedEntries} data={data} />
-                <Breakdown
-                  entries={selectedEntries}
-                  field="customer"
-                  title="Müştərilər üzrə"
-                  subtitle="Müştərilərə sərf olunan vaxt"
-                />
-                <Weekdays entries={selectedEntries} />
-                <Breakdown
-                  entries={selectedEntries}
-                  field="reason"
-                  title="Səbəblər üzrə"
-                  subtitle="Əlavə işin səbəbləri"
-                />
-                <Breakdown
-                  entries={selectedEntries}
-                  field="environment"
-                  title="İş mühiti üzrə"
-                  subtitle="Ofis və məsafədən iş"
-                />
-                <MonthComparison data={data} month={month} />
-              </div>
-            </details>
-          </>
+          <AnalyticsDashboard
+            data={data}
+            period={period}
+            months={months}
+            onPeriod={(key) => {
+              setPeriod(key);
+              setProject("");
+            }}
+            onChangeMonth={changeMonth}
+            onNew={openNew}
+            onSalary={setSalaryMonth}
+            disabled={Boolean(corruptRaw)}
+          />
         )}
         {page === "data" && (
           <div className="data-page">
@@ -1500,52 +1469,5 @@ function ImportPreview({
         </button>
       </div>
     </Modal>
-  );
-}
-
-function MonthComparison({ data, month }: { data: AppData; month: string }) {
-  const date = new Date(`${month}-01T12:00:00`);
-  date.setMonth(date.getMonth() - 1);
-  const previous = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-  const ledger = dailyEntries(data.entries, data.months);
-  const now = ledger.filter((e) => e.date.startsWith(month));
-  const before = ledger.filter((e) => e.date.startsWith(previous));
-  const minutes = now.reduce((s, e) => s + durationMinutes(e), 0),
-    previousMinutes = before.reduce((s, e) => s + durationMinutes(e), 0);
-  const total = now.reduce((s, e) => s + (amount(e, data.months) ?? 0), 0),
-    previousTotal = before.reduce(
-      (s, e) => s + (amount(e, data.months) ?? 0),
-      0,
-    );
-  return (
-    <section className="panel comparison-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Əvvəlki ayla müqayisə</h2>
-          <p>
-            {monthLabel(month)} / {monthLabel(previous)}
-          </p>
-        </div>
-        <BarChart3 size={19} className="muted" />
-      </div>
-      <div className="comparison-row">
-        <span>Faktiki müddət fərqi</span>
-        <strong>
-          {minutes >= previousMinutes ? "+" : "−"}
-          {formatDuration(Math.abs(minutes - previousMinutes))} saat
-        </strong>
-      </div>
-      <div className="comparison-row">
-        <span>Məbləğ fərqi</span>
-        <strong>
-          {total >= previousTotal ? "+" : "−"}
-          {money(Math.abs(total - previousTotal))} ₼
-        </strong>
-      </div>
-      <p className="panel-footnote">
-        Yalnız daxil edilmiş qeydlər müqayisə edilir. Tarifsiz qeydlər məbləğə
-        daxil deyil.
-      </p>
-    </section>
   );
 }

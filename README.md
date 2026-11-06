@@ -23,6 +23,10 @@ npm run start
 
 Birinci təqdim edilmiş Stitch dizaynı əsas götürülür: mərkəzləşdirilmiş üç menyu (**Qeydlərim**, **Analiz**, **Fayllar**), açıq bənövşəyi fon, ağ kartlar və yaşıl vurğu. Açıq/tünd rejim seçimi brauzerdə `artisaat:theme` açarı ilə saxlanır; ilk açılışda sistemin rəng rejimi nəzərə alınır. Inter şrifti lisenziyası ilə birlikdə lokal verilir.
 
+Analiz səhifəsi son təqdim edilmiş Stitch HTML dizaynına uyğunlaşdırılıb: dörd göstərici kartı, son altı ayın sütun qrafiki, layihə və əmsal dairələri, təqvim həftələri üzrə yük və əvvəlki ayla müqayisə cədvəli. Əmsal bölgüsündə saat/məbləğ seçimi, aylıq qrafikdən aya keçid, maaşı tamamlama və boş vəziyyətdən yeni qeyd əlavə etmə işləyir. Müştəri, səbəb, iş mühiti və həftə günləri üzrə əlavə bölgülər açılan bölmədə qalır.
+
+Bütün rəqəmlər mövcud qeydlərdən hesablanır. Əsas əmsal payı faktiki vaxta əsaslanır. Həftələr bazar ertəsi–bazar aralıqları üzrə ayın ilk/son günündə bölünür; istirahət/bayram bölgüsü qeyddəki statusa əsaslanır. Dizayndakı nümunəvi 20 saat limiti tətbiq edilmir; rəsmi aylıq norma məlumat kimi göstərilir. Tarifsiz qeydlər saatlardan çıxarılmır, natamam məbləğlər işarələnir. Ümumi tarixlər seçiləndə aylıq müqayisə göstərilmir. Analiz səhifəsinin rəngləri ayrıca tərtib edilib və mövcud açıq/tünd rejim seçiminə tabedir.
+
 Yeni qeyd formasında bütün xanalar bir pəncərədə açıqdır. Fasilə sahəsi və norma saatını əl ilə dəyişmək imkanı yoxdur. İl/ay tarixdən, norma saatı rəsmi təqvimdən gəlir. Qeyd üçün başlanma və bitmə saatlarını istifadəçi daxil edir.
 
 ## Rəsmi aylıq norma

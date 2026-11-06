@@ -2685,3 +2685,57 @@ body {
     text-align: left;
   }
 }
+
+/* The supplied Stitch analytics design is scoped to this page. */
+.analytics-shell {
+  background: #f4f6fa;
+  min-height: 100vh;
+}
+[data-theme="dark"] .analytics-shell {
+  --bg: #090e1c;
+  --surface: #161b2a;
+  --text: #e5eaf6;
+  --muted: #94a3b8;
+  --green: #34d399;
+  --green-dark: #6ee7b7;
+  --border: #283046;
+  --soft: #1e2436;
+  background: #090e1c;
+}
+.analytics-shell .main-content {
+  max-width: 1328px;
+  padding-top: 31px;
+}
+.analytics-shell .app-header {
+  background: var(--surface);
+}
+[data-theme="dark"] .analytics-shell .app-header {
+  background: #121726;
+}
+.analytics-shell .page-tabs button {
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  height: auto;
+}
+.analytics-shell .page-tabs button.active {
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  color: var(--green);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 25%, transparent);
+}
+[data-theme="dark"] .analytics-shell .brand-mark {
+  background: #103c31;
+  color: #34d399;
+  box-shadow: inset 0 0 0 1px #34d39955;
+}
+@media (max-width: 700px) {
+  .analytics-shell .main-content {
+    padding: 24px 17px 0;
+  }
+  .analytics-shell .page-tabs {
+    gap: 12px;
+  }
+  .analytics-shell .page-tabs button {
+    padding: 7px 13px;
+  }
+}
